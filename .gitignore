@@ -1,0 +1,6 @@
+bin/
+data/
+*.exe
+*.dll
+*.so
+.DS_Store
