@@ -7,6 +7,7 @@ import (
 	"github.com/Full-finger/NDisk/internal/auth"
 	"github.com/Full-finger/NDisk/internal/config"
 	"github.com/Full-finger/NDisk/internal/database"
+	"github.com/Full-finger/NDisk/internal/file"
 	"github.com/Full-finger/NDisk/internal/storage"
 	"github.com/gin-gonic/gin"
 )
@@ -34,6 +35,12 @@ func main() {
 	authService := auth.NewService(db, cfg.JWTSecret)
 	authHandler := auth.NewHandler(authService)
 
+	//初始化文件模块
+	fileService := file.NewService(db, store)
+	fileHandler := file.NewHandler(fileService)
+
+	db.AutoMigrate(&auth.User{}, &file.File{})
+
 	r := gin.Default()
 
 	// 公开路由
@@ -58,6 +65,13 @@ func main() {
 				"username": c.GetString("username"),
 			})
 		})
+
+		//文件路由
+		api.POST("/files/upload", fileHandler.Upload)
+		api.GET("/files", fileHandler.List)
+		api.POST("/folders", fileHandler.CreateFolder)
+		api.GET("/files/:id/download", fileHandler.Download)
+		api.DELETE("/files/:id", fileHandler.Delete)
 	}
 
 	log.Printf("Server starting on :%s", cfg.Port)
