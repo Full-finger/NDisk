@@ -55,12 +55,16 @@ func (h *Handler) FilesPage(c *gin.Context) {
 	files, _ := h.fileService.List(userID, parentID)
 	folders, _ := h.fileService.ListFolders(userID, parentID)
 
+	// 获取面包屑导航路径
+	breadcrumb, _ := h.fileService.GetBreadcrumb(userID, parentID)
+
 	c.HTML(http.StatusOK, "files", gin.H{
-		"title":    "文件管理",
-		"username": username,
-		"files":    files,
-		"folders":  folders,
-		"parentID": parentID,
+		"title":      "文件管理",
+		"username":   username,
+		"files":      files,
+		"folders":    folders,
+		"parentID":   parentID,
+		"breadcrumb": breadcrumb,
 	})
 }
 

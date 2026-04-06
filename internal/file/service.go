@@ -109,6 +109,45 @@ func (s *Service) Download(userID uint, fileID uint) (*File, io.ReadCloser, erro
 	return &file, reader, nil
 }
 
+// BreadcrumbItem 面包屑导航项
+type BreadcrumbItem struct {
+	ID   uint
+	Name string
+}
+
+// GetBreadcrumb 获取当前文件夹的面包屑路径（从根目录到当前目录）
+func (s *Service) GetBreadcrumb(userID uint, folderID *uint) ([]BreadcrumbItem, error) {
+	if folderID == nil {
+		return []BreadcrumbItem{}, nil
+	}
+
+	var path []BreadcrumbItem
+	currentID := *folderID
+	visited := make(map[uint]bool) // 防止循环引用
+
+	for currentID != 0 {
+		if visited[currentID] {
+			break // 检测到循环，退出
+		}
+		visited[currentID] = true
+
+		var folder File
+		if err := s.db.Where("id = ? AND user_id = ? AND is_dir = ?", currentID, userID, true).First(&folder).Error; err != nil {
+			break // 找不到文件夹，退出
+		}
+
+		// 将当前文件夹添加到路径开头
+		path = append([]BreadcrumbItem{{ID: folder.ID, Name: folder.Name}}, path...)
+
+		if folder.ParentID == nil {
+			break
+		}
+		currentID = *folder.ParentID
+	}
+
+	return path, nil
+}
+
 // 删除文件
 func (s *Service) Delete(userID uint, fileID uint) error {
 	var file File
