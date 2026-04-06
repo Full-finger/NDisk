@@ -3,6 +3,8 @@ package file
 import (
 	"fmt"
 	"io"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Full-finger/NDisk/internal/storage"
@@ -24,8 +26,25 @@ func NewService(db *gorm.DB, storage storage.Storage) *Service {
 
 // 上传文件
 func (s *Service) Upload(userID uint, parentID *uint, filename string, size int64, reader io.Reader) (*File, error) {
+	// 安全处理文件名：只取基本文件名，去除路径部分
+	safeFilename := filepath.Base(filename)
+
+	// 进一步清理：移除可能导致问题的字符
+	safeFilename = strings.ReplaceAll(safeFilename, "..", "")
+	safeFilename = strings.TrimSpace(safeFilename)
+
+	// 验证文件名
+	if err := validateName(safeFilename); err != nil {
+		return nil, err
+	}
+
+	// 防止空文件名
+	if safeFilename == "" || safeFilename == "." || safeFilename == "/" {
+		return nil, fmt.Errorf("无效的文件名")
+	}
+
 	// 生成存储key：用户ID/时间戳_uuid/文件名
-	storageKey := fmt.Sprintf("%d/%d_%s/%s", userID, time.Now().Unix(), uuid.New().String()[:8], filename)
+	storageKey := fmt.Sprintf("%d/%d_%s/%s", userID, time.Now().Unix(), uuid.New().String()[:8], safeFilename)
 
 	// 存储文件
 	if err := s.storage.Save(storageKey, reader); err != nil {
@@ -36,7 +55,7 @@ func (s *Service) Upload(userID uint, parentID *uint, filename string, size int6
 	file := &File{
 		UserID:     userID,
 		ParentID:   parentID,
-		Name:       filename,
+		Name:       safeFilename,
 		StorageKey: storageKey,
 		Size:       size,
 		IsDir:      false,
