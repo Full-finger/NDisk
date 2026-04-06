@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/Full-finger/NDisk/internal/auth"
 	"github.com/Full-finger/NDisk/internal/file"
@@ -45,7 +46,10 @@ func (h *Handler) FilesPage(c *gin.Context) {
 	// 获取文件列表
 	var parentID *uint
 	if pid := c.Query("parent_id"); pid != "" {
-		// 已由中间件验证，这里简化处理
+		if id, err := strconv.ParseUint(pid, 10, 32); err == nil {
+			uid := uint(id)
+			parentID = &uid
+		}
 	}
 
 	files, _ := h.fileService.List(userID, parentID)
