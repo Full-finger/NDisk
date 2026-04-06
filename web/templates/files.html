@@ -1,0 +1,142 @@
+{{define "files"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件管理 - NDisk</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="/static/js/app.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+<div class="min-h-screen">
+    <!-- 顶部导航 -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-bold text-gray-800">NDisk 文件管理</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-gray-600">欢迎，{{.username}}</span>
+                    <button onclick="logout()" class="text-red-600 hover:text-red-800">退出登录</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- 操作栏 -->
+        <div class="mb-6 flex flex-wrap gap-4">
+            <!-- 上传文件 -->
+            <form id="upload-form" class="flex items-center gap-2">
+                <input type="file" id="file-input" name="file" class="hidden">
+                <button type="button" onclick="document.getElementById('file-input').click()"
+                    class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                    上传文件
+                </button>
+                {{if .parentID}}
+                <input type="hidden" name="parent_id" value="{{.parentID}}">
+                {{end}}
+            </form>
+
+            <!-- 创建文件夹 -->
+            <button onclick="showCreateFolderModal()"
+                class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors">
+                新建文件夹
+            </button>
+
+            <!-- 返回上级 -->
+            {{if .parentID}}
+            <a href="/files" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors">
+                返回根目录
+            </a>
+            {{end}}
+        </div>
+
+        <!-- 消息提示 -->
+        <div id="message" class="hidden mb-4 p-3 rounded-md"></div>
+
+        <!-- 文件列表 -->
+        <div class="bg-white rounded-lg shadow">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">名称</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">大小</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="file-list">
+                    <!-- 文件夹列表 -->
+                    {{range .folders}}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <svg class="h-5 w-5 text-yellow-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                                </svg>
+                                <a href="/files?parent_id={{.ID}}" class="text-blue-600 hover:underline">{{.Name}}</a>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-gray-500">-</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <button onclick="deleteItem({{.ID}}, true)" class="text-red-600 hover:text-red-800">删除</button>
+                        </td>
+                    </tr>
+                    {{end}}
+
+                    <!-- 文件列表 -->
+                    {{range .files}}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <svg class="h-5 w-5 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/>
+                                </svg>
+                                <span class="text-gray-900">{{.Name}}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{.Size}} bytes</td>
+                        <td class="px-6 py-4 whitespace-nowrap space-x-2">
+                            <button onclick="downloadFile({{.ID}})" class="text-blue-600 hover:text-blue-800">下载</button>
+                            <button onclick="deleteItem({{.ID}}, false)" class="text-red-600 hover:text-red-800">删除</button>
+                        </td>
+                    </tr>
+                    {{end}}
+
+                    {{if and (not .folders) (not .files)}}
+                    <tr>
+                        <td colspan="3" class="px-6 py-4 text-center text-gray-500">暂无文件</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+
+<!-- 创建文件夹模态框 -->
+<div id="create-folder-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-md p-6 w-full max-w-md">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">新建文件夹</h3>
+        <form id="create-folder-form">
+            <input type="text" id="folder-name" name="name" required placeholder="文件夹名称"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
+            {{if .parentID}}
+            <input type="hidden" name="parent_id" value="{{.parentID}}">
+            {{end}}
+            <div class="flex justify-end space-x-2">
+                <button type="button" onclick="hideCreateFolderModal()"
+                    class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">取消</button>
+                <button type="submit"
+                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">创建</button>
+            </div>
+        </form>
+    </div>
+</div>
+</body>
+</html>
+{{end}}

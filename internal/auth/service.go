@@ -46,6 +46,29 @@ func (s *Service) Register(req *RegisterRequest) (*User, error) {
 	return user, nil
 }
 
+// Claims JWT claims 结构
+type Claims struct {
+	UserID   uint   `json:"user_id"`
+	Username string `json:"username"`
+	jwt.RegisteredClaims
+}
+
+// ParseToken 解析并验证 JWT token
+func ParseToken(tokenString, jwtSecret string) (*Claims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(jwtSecret), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
+		return claims, nil
+	}
+
+	return nil, errors.New("invalid token")
+}
+
 // 登录
 func (s *Service) Login(req *LoginRequest) (*LoginResponse, error) {
 	var user User

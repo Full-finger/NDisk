@@ -1,6 +1,7 @@
 package main
 
 import (
+	"html/template"
 	"log"
 	"net/http"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/Full-finger/NDisk/internal/database"
 	"github.com/Full-finger/NDisk/internal/file"
 	"github.com/Full-finger/NDisk/internal/storage"
+	"github.com/Full-finger/NDisk/internal/web"
 	"github.com/gin-gonic/gin"
 )
 
@@ -35,18 +37,39 @@ func main() {
 	authService := auth.NewService(db, cfg.JWTSecret)
 	authHandler := auth.NewHandler(authService)
 
-	//初始化文件模块
+	// 初始化文件模块
 	fileService := file.NewService(db, store)
 	fileHandler := file.NewHandler(fileService)
+
+	// 初始化 Web Handler
+	webHandler := web.NewHandler(authService, fileService, cfg.JWTSecret)
 
 	db.AutoMigrate(&auth.User{}, &file.File{})
 
 	r := gin.Default()
 
+	// 加载模板
+	tmpl := template.Must(template.ParseGlob("web/templates/*.html"))
+	r.SetHTMLTemplate(tmpl)
+
+	// 静态文件服务
+	r.Static("/static", "web/static")
+
 	// 公开路由
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "pong"})
 	})
+
+	// 页面路由（公开）
+	r.GET("/login", webHandler.LoginPage)
+	r.GET("/register", webHandler.RegisterPage)
+
+	// 页面路由（需要认证）
+	filesGroup := r.Group("/files")
+	filesGroup.Use(webHandler.CookieAuthMiddleware())
+	{
+		filesGroup.GET("", webHandler.FilesPage)
+	}
 
 	// 认证路由（无需 JWT）
 	authGroup := r.Group("/api/auth")
@@ -66,13 +89,18 @@ func main() {
 			})
 		})
 
-		//文件路由
+		// 文件路由
 		api.POST("/files/upload", fileHandler.Upload)
 		api.GET("/files", fileHandler.List)
 		api.POST("/folders", fileHandler.CreateFolder)
 		api.GET("/files/:id/download", fileHandler.Download)
 		api.DELETE("/files/:id", fileHandler.Delete)
 	}
+
+	// 首页重定向到登录页
+	r.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "/login")
+	})
 
 	log.Printf("Server starting on :%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
