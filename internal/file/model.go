@@ -29,3 +29,8 @@ type CreateFolderRequest struct {
 	Name     string `json:"name" binding:"required"`
 	ParentID *uint  `json:"parent_id"` // nil表示根目录
 }
+
+// 重命名请求
+type RenameRequest struct {
+	Name string `json:"name" binding:"required"`
+}

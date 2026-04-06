@@ -153,3 +153,30 @@ func (h *Handler) Delete(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }
+
+// 重命名文件或文件夹
+func (h *Handler) Rename(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	fileID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid file id"})
+		return
+	}
+
+	var req RenameRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	file, err := h.service.Rename(userID, uint(fileID), req.Name)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":   file.ID,
+		"name": file.Name,
+	})
+}

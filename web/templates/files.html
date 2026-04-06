@@ -93,7 +93,17 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-gray-500">-</td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <button onclick="deleteItem({{.ID}}, true)" class="text-red-600 hover:text-red-800">删除</button>
+                            <div class="relative inline-block text-left">
+                                <button onclick="toggleDropdown('dropdown-{{.ID}}')" class="text-gray-600 hover:text-gray-800">
+                                    ...
+                                </button>
+                                <div id="dropdown-{{.ID}}" class="hidden absolute right-0 mt-2 w-32 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                                    <div class="py-1">
+                                        <a href="#" data-id="{{.ID}}" data-name="{{.Name}}" onclick="showRenameModalFromLink(this); return false;" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">重命名</a>
+                                        <a href="#" onclick="deleteItem({{.ID}}, true); return false;" class="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">删除</a>
+                                    </div>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                     {{end}}
@@ -110,9 +120,19 @@
                             </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{.Size}} bytes</td>
-                        <td class="px-6 py-4 whitespace-nowrap space-x-2">
-                            <button onclick="downloadFile({{.ID}})" class="text-blue-600 hover:text-blue-800">下载</button>
-                            <button onclick="deleteItem({{.ID}}, false)" class="text-red-600 hover:text-red-800">删除</button>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="relative inline-block text-left">
+                                <button onclick="toggleDropdown('dropdown-file-{{.ID}}')" class="text-gray-600 hover:text-gray-800">
+                                    ...
+                                </button>
+                                <div id="dropdown-file-{{.ID}}" class="hidden absolute right-0 mt-2 w-32 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                                    <div class="py-1">
+                                        <a href="#" onclick="downloadFile({{.ID}}); return false;" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">下载</a>
+                                        <a href="#" data-id="{{.ID}}" data-name="{{.Name}}" onclick="showRenameModalFromLink(this); return false;" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">重命名</a>
+                                        <a href="#" onclick="deleteItem({{.ID}}, false); return false;" class="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">删除</a>
+                                    </div>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                     {{end}}
@@ -143,6 +163,24 @@
                     class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">取消</button>
                 <button type="submit"
                     class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">创建</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 重命名模态框 -->
+<div id="rename-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-md p-6 w-full max-w-md">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">重命名</h3>
+        <form id="rename-form">
+            <input type="hidden" id="rename-item-id">
+            <input type="text" id="rename-item-name" name="name" required placeholder="新名称"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
+            <div class="flex justify-end space-x-2">
+                <button type="button" onclick="hideRenameModal()"
+                    class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">取消</button>
+                <button type="submit"
+                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">确定</button>
             </div>
         </form>
     </div>

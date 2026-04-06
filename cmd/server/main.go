@@ -95,6 +95,7 @@ func main() {
 		api.POST("/folders", fileHandler.CreateFolder)
 		api.GET("/files/:id/download", fileHandler.Download)
 		api.DELETE("/files/:id", fileHandler.Delete)
+		api.PUT("/files/:id/rename", fileHandler.Rename)
 	}
 
 	// 首页重定向到登录页

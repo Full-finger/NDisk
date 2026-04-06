@@ -296,3 +296,98 @@ function logout() {
     clearToken();
     window.location.href = '/login';
 }
+
+// 切换下拉菜单
+function toggleDropdown(id) {
+    // 关闭其他下拉菜单
+    document.querySelectorAll('[id^="dropdown-"]').forEach(el => {
+        if (el.id !== id) {
+            el.classList.add('hidden');
+        }
+    });
+    
+    const dropdown = document.getElementById(id);
+    if (dropdown) {
+        dropdown.classList.toggle('hidden');
+    }
+}
+
+// 点击页面其他地方关闭下拉菜单
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('[onclick^="toggleDropdown"]') && !e.target.closest('[id^="dropdown-"]')) {
+        document.querySelectorAll('[id^="dropdown-"]').forEach(el => {
+            el.classList.add('hidden');
+        });
+    }
+});
+
+// 显示重命名模态框
+function showRenameModal(id, currentName) {
+    const modal = document.getElementById('rename-modal');
+    const idInput = document.getElementById('rename-item-id');
+    const nameInput = document.getElementById('rename-item-name');
+    
+    if (modal && idInput && nameInput) {
+        idInput.value = id;
+        nameInput.value = currentName;
+        modal.classList.remove('hidden');
+        nameInput.focus();
+        nameInput.select();
+    }
+    
+    // 关闭下拉菜单
+    document.querySelectorAll('[id^="dropdown-"]').forEach(el => {
+        el.classList.add('hidden');
+    });
+}
+
+// 从链接元素显示重命名模态框（处理特殊字符）
+function showRenameModalFromLink(element) {
+    const id = element.getAttribute('data-id');
+    const name = element.getAttribute('data-name');
+    showRenameModal(id, name);
+}
+
+// 隐藏重命名模态框
+function hideRenameModal() {
+    const modal = document.getElementById('rename-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+// 重命名表单提交处理
+document.addEventListener('DOMContentLoaded', function() {
+    const renameForm = document.getElementById('rename-form');
+    if (renameForm) {
+        renameForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const id = document.getElementById('rename-item-id').value;
+            const newName = document.getElementById('rename-item-name').value;
+            
+            try {
+                const response = await fetch(`/api/files/${id}/rename`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeader(),
+                    },
+                    body: JSON.stringify({ name: newName }),
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage('重命名成功');
+                    hideRenameModal();
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showMessage(data.error || '重命名失败', true);
+                }
+            } catch (err) {
+                showMessage('网络错误，请重试', true);
+            }
+        });
+    }
+});

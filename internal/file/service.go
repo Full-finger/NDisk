@@ -162,3 +162,73 @@ func (s *Service) Delete(userID uint, fileID uint) error {
 
 	return s.db.Delete(&file).Error
 }
+
+// 重命名文件或文件夹
+func (s *Service) Rename(userID uint, fileID uint, newName string) (*File, error) {
+	var file File
+	if err := s.db.Where("id = ? AND user_id = ?", fileID, userID).First(&file).Error; err != nil {
+		return nil, err
+	}
+
+	// 验证新名称
+	if err := validateName(newName); err != nil {
+		return nil, err
+	}
+
+	// 检查同一目录下是否存在同名文件/文件夹
+	query := s.db.Where("user_id = ? AND name = ? AND id != ?", userID, newName, fileID)
+	if file.ParentID == nil {
+		query = query.Where("parent_id IS NULL")
+	} else {
+		query = query.Where("parent_id = ?", *file.ParentID)
+	}
+
+	var existing File
+	if err := query.First(&existing).Error; err == nil {
+		return nil, fmt.Errorf("同名文件或文件夹已存在")
+	}
+
+	// 更新名称
+	file.Name = newName
+	if err := s.db.Save(&file).Error; err != nil {
+		return nil, err
+	}
+
+	return &file, nil
+}
+
+// validateName 验证文件名是否符合规则
+func validateName(name string) error {
+	if name == "" {
+		return fmt.Errorf("文件名不能为空")
+	}
+
+	// 检查是否只包含空格或点
+	onlySpaceOrDot := true
+	for _, r := range name {
+		if r != ' ' && r != '.' {
+			onlySpaceOrDot = false
+			break
+		}
+	}
+	if onlySpaceOrDot {
+		return fmt.Errorf("文件名不能只包含空格或点")
+	}
+
+	// 检查禁止字符
+	forbiddenChars := []rune{'\\', '/', ':', '*', '?', '"', '<', '>', '|'}
+	for _, r := range name {
+		for _, f := range forbiddenChars {
+			if r == f {
+				return fmt.Errorf("文件名不能包含以下字符: \\ / : * ? \" < > |")
+			}
+		}
+	}
+
+	// 检查名称长度
+	if len(name) > 255 {
+		return fmt.Errorf("文件名过长，最大255个字符")
+	}
+
+	return nil
+}
