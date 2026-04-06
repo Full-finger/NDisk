@@ -1,0 +1,18 @@
+# NDisk 配置文件示例
+# 复制此文件为 config.toml 并修改配置
+
+# 服务端口
+port = "8080"
+
+# JWT 密钥
+jwt_secret = "your-secret-key-change-in-production"
+
+[database]
+# 数据库驱动 (sqlite, mysql, postgres)
+driver = "sqlite"
+# 数据库连接字符串
+dsn = "data/netdisk.db"
+
+[storage]
+# 文件存储路径
+path = "data/uploads"
