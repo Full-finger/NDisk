@@ -63,14 +63,6 @@ func (s *Service) Register(req *RegisterRequest) (*User, error) {
 func validateUsername(username string) error {
 	username = strings.TrimSpace(username)
 
-	// 检查长度
-	if len(username) < 3 {
-		return errors.New("用户名至少需要 3 个字符")
-	}
-	if len(username) > 32 {
-		return errors.New("用户名最多 32 个字符")
-	}
-
 	// 检查是否只包含字母、数字和下划线
 	matched, _ := regexp.MatchString("^[a-zA-Z0-9_]+$", username)
 	if !matched {
@@ -82,14 +74,6 @@ func validateUsername(username string) error {
 
 // validatePassword 验证密码强度
 func validatePassword(password string) error {
-	// 检查长度
-	if len(password) < 8 {
-		return errors.New("密码至少需要 8 个字符")
-	}
-	if len(password) > 128 {
-		return errors.New("密码最多 128 个字符")
-	}
-
 	var hasUpper, hasLower, hasDigit bool
 	for _, r := range password {
 		if unicode.IsUpper(r) {

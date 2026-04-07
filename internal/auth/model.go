@@ -18,7 +18,7 @@ type User struct {
 // 注册请求
 type RegisterRequest struct {
 	Username string `json:"username" binding:"required,min=3,max=32"`
-	Password string `json:"password" binding:"required,min=6,max=128"`
+	Password string `json:"password" binding:"required,min=8,max=128"`
 }
 
 // 登录请求
