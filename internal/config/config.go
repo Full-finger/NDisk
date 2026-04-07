@@ -54,8 +54,8 @@ func Load() (*Config, error) {
 	}
 
 	// 检查是否使用了默认的 JWT 密钥
-	if cfg.JWTSecret == "your-secret-key-change-in-production" {
-		fmt.Println("WARNING: Using default JWT secret. Please set a secure secret in config.toml or NDISK_JWT_SECRET environment variable!")
+	if cfg.JWTSecret == "your-secret-key-change-in-production" || cfg.JWTSecret == "" {
+		return nil, fmt.Errorf("JWT_SECRET must be set and cannot use default value")
 	}
 
 	return &cfg, nil
