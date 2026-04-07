@@ -4,6 +4,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/Full-finger/NDisk/internal/auth"
 	"github.com/Full-finger/NDisk/internal/config"
@@ -71,11 +72,16 @@ func main() {
 		filesGroup.GET("", webHandler.FilesPage)
 	}
 
+	// 创建速率限制器：每分钟最多 5 次登录/注册尝试
+	authRateLimiter := auth.NewRateLimiter(5, time.Minute)
+
 	// 认证路由（无需 JWT）
 	authGroup := r.Group("/api/auth")
 	{
-		authGroup.POST("/register", authHandler.Register)
-		authGroup.POST("/login", authHandler.Login)
+		// 注册和登录接口应用速率限制
+		authGroup.POST("/register", auth.RateLimitMiddleware(authRateLimiter), authHandler.Register)
+		authGroup.POST("/login", auth.RateLimitMiddleware(authRateLimiter), authHandler.Login)
+		authGroup.POST("/logout", authHandler.Logout)
 	}
 
 	// 受保护路由（需要 JWT）
