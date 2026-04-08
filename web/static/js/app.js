@@ -127,43 +127,50 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // 上传文件处理
+    // 使用 Resumable.js 实现断续上传
     const fileInput = document.getElementById('file-input');
     if (fileInput) {
-        fileInput.addEventListener('change', async function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            const formData = new FormData();
-            formData.append('file', file);
-            
-            // 检查是否有 parent_id
-            const parentInput = document.querySelector('input[name="parent_id"]');
-            if (parentInput) {
-                formData.append('parent_id', parentInput.value);
-            }
-            
-            try {
-                const response = await fetch('/api/files/upload', {
-                    method: 'POST',
-                    headers: getAuthHeader(),
-                    body: formData,
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    showMessage('文件上传成功');
-                    setTimeout(() => window.location.reload(), 1000);
-                } else {
-                    showMessage(data.error || '上传失败', true);
+        var r = new Resumable({
+            target: '/api/files/upload',
+            testTarget: '/api/files/upload',
+            testChunks: true,
+            chunkSize: 1 * 1024 * 1024, // 1MB
+            simultaneousUploads: 3,
+            headers: getAuthHeader(),
+            query: function(file, chunk) {
+                // 附加 parent_id 到每个请求
+                var parentInput = document.querySelector('input[name="parent_id"]');
+                var params = {};
+                if (parentInput && parentInput.value) {
+                    params.parent_id = parentInput.value;
                 }
-            } catch (err) {
-                showMessage('网络错误，请重试', true);
+                return params;
             }
-            
-            // 清空文件选择
-            fileInput.value = '';
+        });
+
+        r.assignBrowse(fileInput);
+
+        r.on('fileAdded', function(file) {
+            showMessage('正在上传: ' + file.fileName);
+            r.upload();
+        });
+
+        r.on('fileSuccess', function(file) {
+            showMessage(file.fileName + ' 上传成功');
+            setTimeout(function() { window.location.reload(); }, 1000);
+        });
+
+        r.on('fileError', function(file, message) {
+            showMessage(file.fileName + ' 上传失败: ' + message, true);
+        });
+
+        r.on('error', function(message, file) {
+            showMessage('上传出错: ' + message, true);
+        });
+
+        r.on('complete', function() {
+            showMessage('所有文件上传完成');
+            setTimeout(function() { window.location.reload(); }, 1000);
         });
     }
     
