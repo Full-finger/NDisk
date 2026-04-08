@@ -3,6 +3,7 @@ package file
 import (
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -125,7 +126,7 @@ func (h *Handler) Download(c *gin.Context) {
 	defer reader.Close()
 
 	// 设置下载头
-	c.Header("Content-Disposition", "attachment; filename="+file.Name)
+	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(file.Name))
 	c.Header("Content-Type", "application/octet-stream")
 	c.Header("Content-Length", strconv.FormatInt(file.Size, 10))
 

@@ -272,7 +272,7 @@ async function downloadFile(id) {
         if (contentDisposition) {
             const match = contentDisposition.match(/filename=(.+)/);
             if (match) {
-                filename = match[1];
+                filename = decodeURIComponent(match[1]);
             }
         }
         
