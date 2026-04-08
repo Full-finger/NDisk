@@ -54,6 +54,79 @@ function showMessage(message, isError = false) {
     }
 }
 
+// ========== 上传进度水波球 ==========
+function getProgressBall() {
+    return document.getElementById('upload-progress-ball');
+}
+
+function getProgressWater() {
+    return document.querySelector('#upload-progress-ball .water');
+}
+
+function getProgressText() {
+    return document.querySelector('#upload-progress-ball .percent-text');
+}
+
+function showProgressBall() {
+    var ball = getProgressBall();
+    if (ball) {
+        ball.classList.add('visible');
+    }
+    updateProgressBall(0);
+}
+
+function hideProgressBall(delay) {
+    delay = delay || 0;
+    setTimeout(function() {
+        var ball = getProgressBall();
+        if (ball) {
+            ball.classList.remove('visible');
+        }
+        // 重置状态
+        setTimeout(function() {
+            updateProgressBall(0);
+            var water = getProgressWater();
+            if (water) {
+                water.style.background = 'linear-gradient(180deg, #5ca0e8 0%, #2670c4 100%)';
+            }
+            var text = getProgressText();
+            if (text) {
+                text.style.color = '#3b82f6';
+            }
+        }, 500);
+    }, delay);
+}
+
+function updateProgressBall(percent) {
+    var water = getProgressWater();
+    var text = getProgressText();
+    if (water) {
+        water.style.height = percent + '%';
+    }
+    if (text) {
+        text.textContent = Math.round(percent) + '%';
+        // 进度高于 50% 时文字变白色以保持可读性
+        if (percent > 50) {
+            text.style.color = '#ffffff';
+        } else {
+            text.style.color = '#3b82f6';
+        }
+    }
+}
+
+function setProgressBallError() {
+    var water = getProgressWater();
+    var text = getProgressText();
+    if (water) {
+        water.style.background = 'linear-gradient(180deg, #f87171 0%, #dc2626 100%)';
+    }
+    if (text) {
+        text.style.color = '#ffffff';
+        text.textContent = '失败';
+    }
+}
+// ========== 上传进度水波球 END ==========
+
 // 登录处理
 document.addEventListener('DOMContentLoaded', function() {
     const loginForm = document.getElementById('login-form');
@@ -152,25 +225,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
         r.on('fileAdded', function(file) {
             showMessage('正在上传: ' + file.fileName);
+            showProgressBall();
             r.upload();
+        });
+
+        r.on('fileProgress', function(file) {
+            var percent = file.progress(false) * 100;
+            updateProgressBall(percent);
         });
 
         r.on('fileSuccess', function(file) {
             showMessage(file.fileName + ' 上传成功');
-            setTimeout(function() { window.location.reload(); }, 1000);
+            updateProgressBall(100);
+            hideProgressBall(1500);
+            setTimeout(function() { window.location.reload(); }, 2000);
         });
 
         r.on('fileError', function(file, message) {
             showMessage(file.fileName + ' 上传失败: ' + message, true);
+            setProgressBallError();
+            hideProgressBall(3000);
         });
 
         r.on('error', function(message, file) {
             showMessage('上传出错: ' + message, true);
+            setProgressBallError();
+            hideProgressBall(3000);
         });
 
         r.on('complete', function() {
-            showMessage('所有文件上传完成');
-            setTimeout(function() { window.location.reload(); }, 1000);
+            updateProgressBall(100);
+            hideProgressBall(1500);
+            setTimeout(function() { window.location.reload(); }, 2000);
         });
     }
     

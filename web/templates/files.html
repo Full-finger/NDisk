@@ -9,6 +9,105 @@
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="/static/js/resumable.js"></script>
     <script src="/static/js/app.js"></script>
+    <style>
+        /* 上传进度水波球 */
+        #upload-progress-ball {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 100;
+            opacity: 0;
+            transform: scale(0.3);
+            pointer-events: none;
+            transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        #upload-progress-ball.visible {
+            opacity: 1;
+            transform: scale(1);
+            pointer-events: auto;
+        }
+
+        .progress-ball {
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+            background: #dfe9f7;
+            box-shadow:
+                0 6px 20px rgba(41, 104, 178, 0.3),
+                0 0 0 3px rgba(255, 255, 255, 0.7);
+        }
+
+        .progress-ball .water {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 0%;
+            background: linear-gradient(180deg, #5ca0e8 0%, #2670c4 100%);
+            transition: height 0.3s ease-out;
+        }
+
+        .progress-ball .water .wave1,
+        .progress-ball .water .wave2 {
+            position: absolute;
+            width: 300%;
+            height: 24px;
+        }
+
+        .progress-ball .water .wave1 {
+            top: -12px;
+            left: -120%;
+            border-radius: 42%;
+            background: rgba(255, 255, 255, 0.25);
+            animation: wave-motion 2.8s ease-in-out infinite;
+        }
+
+        .progress-ball .water .wave2 {
+            top: -8px;
+            left: -80%;
+            height: 20px;
+            border-radius: 38%;
+            background: rgba(255, 255, 255, 0.15);
+            animation: wave-motion 3.5s ease-in-out infinite reverse;
+        }
+
+        @keyframes wave-motion {
+            0%, 100% { transform: translateX(0) rotate(0deg); }
+            50% { transform: translateX(25%) rotate(2deg); }
+        }
+
+        .progress-ball .percent-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.15rem;
+            font-weight: 700;
+            z-index: 10;
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+            pointer-events: none;
+            user-select: none;
+            transition: color 0.3s ease;
+        }
+
+        /* 上传中脉冲光效 */
+        #upload-progress-ball.visible .progress-ball::after {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: 50%;
+            border: 2px solid rgba(74, 144, 226, 0.4);
+            animation: pulse-ring 1.5s ease-out infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(1.25); opacity: 0; }
+        }
+    </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
 <div class="min-h-screen">
@@ -186,6 +285,18 @@
         </form>
     </div>
 </div>
+
+<!-- 上传进度水波球 -->
+<div id="upload-progress-ball">
+    <div class="progress-ball">
+        <div class="water">
+            <div class="wave1"></div>
+            <div class="wave2"></div>
+        </div>
+        <span class="percent-text" style="color: #3b82f6;">0%</span>
+    </div>
+</div>
+
 </body>
 </html>
 {{end}}
