@@ -100,6 +100,7 @@ func main() {
 		api.GET("/files", fileHandler.List)
 		api.POST("/folders", fileHandler.CreateFolder)
 		api.GET("/files/:id/download", fileHandler.Download)
+		api.HEAD("/files/:id/download", fileHandler.DownloadHead)
 		api.DELETE("/files/:id", fileHandler.Delete)
 		api.PUT("/files/:id/rename", fileHandler.Rename)
 	}

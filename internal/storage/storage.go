@@ -6,6 +6,7 @@ import "io"
 type Storage interface {
 	Save(key string, reader io.Reader) error
 	Open(key string) (io.ReadCloser, error)
+	OpenRange(key string, offset, length int64) (io.ReadCloser, error)
 	Delete(key string) error
 	Exists(key string) bool
 }

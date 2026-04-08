@@ -1,6 +1,7 @@
 package file
 
 import (
+	"net/http"
 	"time"
 
 	"gorm.io/gorm"
@@ -17,6 +18,11 @@ type File struct {
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 	DeletedAt  gorm.DeletedAt `gorm:"index"`
+}
+
+// LastModified 返回HTTP格式的修改时间
+func (f *File) LastModified() string {
+	return f.UpdatedAt.UTC().Format(http.TimeFormat)
 }
 
 // 上传请求

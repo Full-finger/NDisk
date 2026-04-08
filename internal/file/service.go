@@ -128,6 +128,38 @@ func (s *Service) Download(userID uint, fileID uint) (*File, io.ReadCloser, erro
 	return &file, reader, nil
 }
 
+// DownloadRange 范围下载
+func (s *Service) DownloadRange(userID uint, fileID uint, offset, length int64) (*File, io.ReadCloser, error) {
+	var file File
+	if err := s.db.Where("id = ? AND user_id = ?", fileID, userID).First(&file).Error; err != nil {
+		return nil, nil, err
+	}
+	if file.IsDir {
+		return nil, nil, fmt.Errorf("cannot download directory")
+	}
+
+	reader, err := s.storage.OpenRange(file.StorageKey, offset, length)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &file, reader, nil
+}
+
+// GetFile 获取文件信息（不打开文件）
+func (s *Service) GetFile(userID uint, fileID uint) (*File, error) {
+	var file File
+	if err := s.db.Where("id = ? AND user_id = ?", fileID, userID).First(&file).Error; err != nil {
+		return nil, err
+	}
+	return &file, nil
+}
+
+// ETag 生成文件ETag
+func (f *File) ETag() string {
+	return fmt.Sprintf(`"%x-%d"`, f.ID, f.Size)
+}
+
 // BreadcrumbItem 面包屑导航项
 type BreadcrumbItem struct {
 	ID   uint
