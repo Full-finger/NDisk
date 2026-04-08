@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Full-finger/NDisk/internal/auth"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,11 +18,12 @@ type httpRange struct {
 }
 
 type Handler struct {
-	service *Service
+	service   *Service
+	jwtSecret string
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service *Service, jwtSecret string) *Handler {
+	return &Handler{service: service, jwtSecret: jwtSecret}
 }
 
 // 上传文件
@@ -116,9 +118,24 @@ func (h *Handler) List(c *gin.Context) {
 	})
 }
 
-// 下载文件（支持Range请求）
+// 下载文件（支持Range请求，从Cookie或Authorization header认证）
 func (h *Handler) Download(c *gin.Context) {
 	userID := c.GetUint("user_id")
+
+	// 如果没有通过中间件获取到userID，尝试从Cookie解析
+	if userID == 0 {
+		if tokenStr, err := c.Cookie("token"); err == nil && tokenStr != "" {
+			if claims, err := auth.ParseToken(tokenStr, h.jwtSecret); err == nil {
+				userID = claims.UserID
+			}
+		}
+	}
+
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	fileID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid file id"})

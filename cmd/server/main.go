@@ -40,7 +40,7 @@ func main() {
 
 	// 初始化文件模块
 	fileService := file.NewService(db, store)
-	fileHandler := file.NewHandler(fileService)
+	fileHandler := file.NewHandler(fileService, cfg.JWTSecret)
 
 	// 初始化 Web Handler
 	webHandler := web.NewHandler(authService, fileService, cfg.JWTSecret)
@@ -84,6 +84,10 @@ func main() {
 		authGroup.POST("/logout", authHandler.Logout)
 	}
 
+	// 下载路由（支持query参数token，不走JWT中间件）
+	r.GET("/api/files/:id/download", fileHandler.Download)
+	r.HEAD("/api/files/:id/download", fileHandler.DownloadHead)
+
 	// 受保护路由（需要 JWT）
 	api := r.Group("/api")
 	api.Use(auth.JWTMiddleware(cfg.JWTSecret))
@@ -99,8 +103,6 @@ func main() {
 		api.POST("/files/upload", fileHandler.Upload)
 		api.GET("/files", fileHandler.List)
 		api.POST("/folders", fileHandler.CreateFolder)
-		api.GET("/files/:id/download", fileHandler.Download)
-		api.HEAD("/files/:id/download", fileHandler.DownloadHead)
 		api.DELETE("/files/:id", fileHandler.Delete)
 		api.PUT("/files/:id/rename", fileHandler.Rename)
 	}

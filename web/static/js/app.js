@@ -253,42 +253,8 @@ async function deleteItem(id, isFolder) {
 }
 
 // 下载文件
-async function downloadFile(id) {
-    try {
-        const response = await fetch(`/api/files/${id}/download`, {
-            method: 'GET',
-            headers: getAuthHeader(),
-        });
-        
-        if (!response.ok) {
-            const data = await response.json();
-            showMessage(data.error || '下载失败', true);
-            return;
-        }
-        
-        // 获取文件名
-        const contentDisposition = response.headers.get('Content-Disposition');
-        let filename = 'download';
-        if (contentDisposition) {
-            const match = contentDisposition.match(/filename=(.+)/);
-            if (match) {
-                filename = decodeURIComponent(match[1]);
-            }
-        }
-        
-        // 下载文件
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-    } catch (err) {
-        showMessage('网络错误，请重试', true);
-    }
+function downloadFile(id) {
+    window.location.href = `/api/files/${id}/download`;
 }
 
 // 退出登录
