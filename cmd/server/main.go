@@ -101,6 +101,7 @@ func main() {
 
 		// 文件路由
 		api.POST("/files/upload", fileHandler.Upload)
+		api.GET("/files/upload", fileHandler.TestChunk)
 		api.GET("/files", fileHandler.List)
 		api.POST("/folders", fileHandler.CreateFolder)
 		api.DELETE("/files/:id", fileHandler.Delete)

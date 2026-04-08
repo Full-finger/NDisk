@@ -70,3 +70,24 @@ func (l *LocalStorage) Exists(key string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
+
+// Append 向已有文件追加数据，如果文件不存在则创建
+func (l *LocalStorage) Append(key string, reader io.Reader) error {
+	path := filepath.Join(l.BasePath, key)
+	os.MkdirAll(filepath.Dir(path), 0755)
+
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = io.Copy(f, reader)
+	return err
+}
+
+// DeleteDir 删除整个目录及其内容
+func (l *LocalStorage) DeleteDir(key string) error {
+	path := filepath.Join(l.BasePath, key)
+	return os.RemoveAll(path)
+}

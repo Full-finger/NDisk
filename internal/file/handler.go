@@ -26,10 +26,124 @@ func NewHandler(service *Service, jwtSecret string) *Handler {
 	return &Handler{service: service, jwtSecret: jwtSecret}
 }
 
-// 上传文件
+// TestChunk 处理 GET 请求，检查分块是否已上传
+func (h *Handler) TestChunk(c *gin.Context) {
+	identifier := c.Query("resumableIdentifier")
+	chunkNumberStr := c.Query("resumableChunkNumber")
+
+	if identifier == "" || chunkNumberStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing resumable parameters"})
+		return
+	}
+
+	chunkNumber, err := strconv.Atoi(chunkNumberStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid chunk number"})
+		return
+	}
+
+	if h.service.ChunkExists(identifier, chunkNumber) {
+		c.JSON(http.StatusOK, gin.H{"message": "chunk already uploaded"})
+	} else {
+		c.JSON(http.StatusNotFound, gin.H{"error": "chunk not found"})
+	}
+}
+
+// 上传文件（支持 resumable.js 分块上传）
 func (h *Handler) Upload(c *gin.Context) {
 	userID := c.GetUint("user_id")
 
+	// 检查是否为 resumable.js 分块上传
+	chunkNumber := c.PostForm("resumableChunkNumber")
+	identifier := c.PostForm("resumableIdentifier")
+	totalSizeStr := c.PostForm("resumableTotalSize")
+	totalChunksStr := c.PostForm("resumableTotalChunks")
+	filename := c.PostForm("resumableFilename")
+
+	if chunkNumber != "" && identifier != "" {
+		// 分块上传模式
+		h.uploadChunk(c, userID, chunkNumber, identifier, totalSizeStr, totalChunksStr, filename)
+		return
+	}
+
+	// 普通整文件上传模式（向后兼容）
+	h.uploadWholeFile(c, userID)
+}
+
+// uploadChunk 处理分块上传
+func (h *Handler) uploadChunk(c *gin.Context, userID uint, chunkNumberStr, identifier, totalSizeStr, totalChunksStr, filename string) {
+	chunkNumber, err := strconv.Atoi(chunkNumberStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid chunk number"})
+		return
+	}
+
+	totalChunks, err := strconv.Atoi(totalChunksStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid total chunks"})
+		return
+	}
+
+	totalSize, err := strconv.ParseInt(totalSizeStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid total size"})
+		return
+	}
+
+	// 获取上传的 chunk 文件
+	formFile, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no file uploaded"})
+		return
+	}
+
+	// 打开文件流
+	file, err := formFile.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot open file"})
+		return
+	}
+	defer file.Close()
+
+	// 保存分块
+	if err := h.service.SaveChunk(identifier, chunkNumber, file); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save chunk"})
+		return
+	}
+
+	// 检查是否所有分块都已上传
+	if h.service.AllChunksUploaded(identifier, totalChunks) {
+		// 获取 parent_id
+		var parentID *uint
+		if pid := c.PostForm("parent_id"); pid != "" {
+			if id, err := strconv.ParseUint(pid, 10, 32); err == nil {
+				uid := uint(id)
+				parentID = &uid
+			}
+		}
+
+		// 合并所有分块
+		result, err := h.service.UploadFromChunks(userID, parentID, filename, totalSize, identifier, totalChunks)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"id":        result.ID,
+			"name":      result.Name,
+			"size":      result.Size,
+			"parent_id": result.ParentID,
+		})
+		return
+	}
+
+	// 分块已保存，但未全部上传完成
+	c.JSON(http.StatusOK, gin.H{"message": "chunk uploaded"})
+}
+
+// uploadWholeFile 处理普通整文件上传（向后兼容）
+func (h *Handler) uploadWholeFile(c *gin.Context, userID uint) {
 	// 获取 parent_id（可选）
 	var parentID *uint
 	if pid := c.PostForm("parent_id"); pid != "" {

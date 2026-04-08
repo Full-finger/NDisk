@@ -248,6 +248,87 @@ func (s *Service) Rename(userID uint, fileID uint, newName string) (*File, error
 	return &file, nil
 }
 
+// chunkKey 返回 chunk 临时文件的存储 key
+func chunkKey(identifier string, chunkNumber int) string {
+	return fmt.Sprintf(".chunks/%s/%d", identifier, chunkNumber)
+}
+
+// chunkCompleteMarker 返回上传完成的标记文件 key
+func chunkCompleteMarker(identifier string) string {
+	return fmt.Sprintf(".chunks/%s/.complete", identifier)
+}
+
+// SaveChunk 保存单个分块到临时存储
+func (s *Service) SaveChunk(identifier string, chunkNumber int, reader io.Reader) error {
+	key := chunkKey(identifier, chunkNumber)
+	return s.storage.Save(key, reader)
+}
+
+// ChunkExists 检查分块是否已上传
+func (s *Service) ChunkExists(identifier string, chunkNumber int) bool {
+	// 先检查完成标记，如果文件已合并完成，所有 chunk 都视为已存在
+	if s.storage.Exists(chunkCompleteMarker(identifier)) {
+		return true
+	}
+	return s.storage.Exists(chunkKey(identifier, chunkNumber))
+}
+
+// AllChunksUploaded 检查所有分块是否都已上传
+func (s *Service) AllChunksUploaded(identifier string, totalChunks int) bool {
+	for i := 1; i <= totalChunks; i++ {
+		if !s.storage.Exists(chunkKey(identifier, i)) {
+			return false
+		}
+	}
+	return true
+}
+
+// UploadFromChunks 合并所有分块并创建文件记录
+func (s *Service) UploadFromChunks(userID uint, parentID *uint, filename string, totalSize int64, identifier string, totalChunks int) (*File, error) {
+	// 按顺序打开所有分块
+	var readers []io.Reader
+	var closers []io.ReadCloser
+
+	for i := 1; i <= totalChunks; i++ {
+		key := chunkKey(identifier, i)
+		reader, err := s.storage.Open(key)
+		if err != nil {
+			// 清理已打开的 reader
+			for _, c := range closers {
+				c.Close()
+			}
+			return nil, fmt.Errorf("分块 %d 未找到: %v", i, err)
+		}
+		readers = append(readers, reader)
+		closers = append(closers, reader)
+	}
+
+	// 合并所有分块为一个 reader
+	combined := io.MultiReader(readers...)
+
+	// 调用已有的 Upload 方法完成最终存储和数据库记录
+	result, err := s.Upload(userID, parentID, filename, totalSize, combined)
+
+	// 关闭所有分块 reader
+	for _, c := range closers {
+		c.Close()
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// 创建完成标记（在清理分块之前，防止并发问题）
+	s.storage.Save(chunkCompleteMarker(identifier), strings.NewReader(""))
+
+	// 清理临时分块文件
+	for i := 1; i <= totalChunks; i++ {
+		s.storage.Delete(chunkKey(identifier, i))
+	}
+
+	return result, nil
+}
+
 // validateName 验证文件名是否符合规则
 func validateName(name string) error {
 	if name == "" {
