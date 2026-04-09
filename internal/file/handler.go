@@ -504,3 +504,42 @@ func (h *Handler) Rename(c *gin.Context) {
 		"name": file.Name,
 	})
 }
+
+// 移动文件或文件夹
+func (h *Handler) Move(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	fileID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid file id"})
+		return
+	}
+
+	var req MoveRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	file, err := h.service.Move(userID, uint(fileID), req.TargetID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":        file.ID,
+		"name":      file.Name,
+		"parent_id": file.ParentID,
+	})
+}
+
+// ListAllFolders 获取所有文件夹（用于移动目标选择）
+func (h *Handler) ListAllFolders(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	folders, err := h.service.ListAllFolders(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"folders": folders})
+}

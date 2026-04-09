@@ -450,3 +450,119 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// 显示移动模态框
+async function showMoveModal(element) {
+    const id = element.getAttribute('data-id');
+    const modal = document.getElementById('move-modal');
+    const idInput = document.getElementById('move-item-id');
+    const select = document.getElementById('move-target-id');
+
+    if (modal && idInput && select) {
+        idInput.value = id;
+
+        // 关闭下拉菜单
+        document.querySelectorAll('[id^="dropdown-"]').forEach(el => {
+            el.classList.add('hidden');
+        });
+
+        // 清空并加载文件夹列表
+        select.innerHTML = '<option value="">根目录</option>';
+
+        try {
+            const response = await fetch('/api/folders/all', {
+                headers: getAuthHeader(),
+            });
+            const data = await response.json();
+
+            if (response.ok && data.folders) {
+                // 构建 id -> folder 映射
+                const folderMap = {};
+                data.folders.forEach(function(f) {
+                    folderMap[f.ID] = f;
+                });
+
+                // 为每个文件夹构建完整路径
+                data.folders.forEach(function(f) {
+                    // 排除自身（不能移动到自己里面）
+                    if (String(f.ID) === String(id)) return;
+
+                    var path = buildFolderPath(f, folderMap);
+                    var option = document.createElement('option');
+                    option.value = f.ID;
+                    option.textContent = path;
+                    select.appendChild(option);
+                });
+            }
+        } catch (err) {
+            // 加载失败不影响使用，用户至少可以选根目录
+        }
+
+        modal.classList.remove('hidden');
+    }
+}
+
+// 构建文件夹的完整路径
+function buildFolderPath(folder, folderMap) {
+    var parts = [folder.Name];
+    var current = folder;
+    var visited = {};
+
+    while (current.ParentID && folderMap[current.ParentID]) {
+        if (visited[current.ID]) break;
+        visited[current.ID] = true;
+
+        current = folderMap[current.ParentID];
+        parts.unshift(current.Name);
+    }
+
+    return '根目录 / ' + parts.join(' / ');
+}
+
+// 隐藏移动模态框
+function hideMoveModal() {
+    const modal = document.getElementById('move-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+// 移动表单提交处理
+document.addEventListener('DOMContentLoaded', function() {
+    const moveForm = document.getElementById('move-form');
+    if (moveForm) {
+        moveForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const id = document.getElementById('move-item-id').value;
+            const targetValue = document.getElementById('move-target-id').value;
+            const body = {};
+            if (targetValue) {
+                body.target_id = parseInt(targetValue);
+            }
+
+            try {
+                const response = await fetch(`/api/files/${id}/move`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeader(),
+                    },
+                    body: JSON.stringify(body),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage('移动成功');
+                    hideMoveModal();
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showMessage(data.error || '移动失败', true);
+                }
+            } catch (err) {
+                showMessage('网络错误，请重试', true);
+            }
+        });
+    }
+});

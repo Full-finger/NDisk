@@ -106,6 +106,8 @@ func main() {
 		api.POST("/folders", fileHandler.CreateFolder)
 		api.DELETE("/files/:id", fileHandler.Delete)
 		api.PUT("/files/:id/rename", fileHandler.Rename)
+		api.PUT("/files/:id/move", fileHandler.Move)
+		api.GET("/folders/all", fileHandler.ListAllFolders)
 	}
 
 	// 首页重定向到登录页

@@ -40,3 +40,8 @@ type CreateFolderRequest struct {
 type RenameRequest struct {
 	Name string `json:"name" binding:"required"`
 }
+
+// 移动请求
+type MoveRequest struct {
+	TargetID *uint `json:"target_id"` // 目标文件夹ID，nil表示根目录
+}

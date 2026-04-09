@@ -329,6 +329,87 @@ func (s *Service) UploadFromChunks(userID uint, parentID *uint, filename string,
 	return result, nil
 }
 
+// ListAllFolders 获取用户所有文件夹（用于移动目标选择等场景）
+func (s *Service) ListAllFolders(userID uint) ([]File, error) {
+	var folders []File
+	err := s.db.Where("user_id = ? AND is_dir = ?", userID, true).Find(&folders).Error
+	return folders, err
+}
+
+// Move 移动文件或文件夹到目标目录
+func (s *Service) Move(userID uint, itemID uint, targetID *uint) (*File, error) {
+	// 查找源项目
+	var item File
+	if err := s.db.Where("id = ? AND user_id = ?", itemID, userID).First(&item).Error; err != nil {
+		return nil, fmt.Errorf("项目不存在")
+	}
+
+	// 验证目标文件夹
+	if targetID != nil {
+		var target File
+		if err := s.db.Where("id = ? AND user_id = ? AND is_dir = ?", *targetID, userID, true).First(&target).Error; err != nil {
+			return nil, fmt.Errorf("目标文件夹不存在")
+		}
+
+		// 不能移动到自身
+		if *targetID == itemID {
+			return nil, fmt.Errorf("不能移动到自身")
+		}
+
+		// 循环引用检查：如果移动的是文件夹，目标不能是源的后代
+		if item.IsDir {
+			if err := s.checkNotDescendant(itemID, *targetID, userID); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// 检查目标目录下是否已存在同名项
+	query := s.db.Where("user_id = ? AND name = ? AND id != ?", userID, item.Name, itemID)
+	if targetID == nil {
+		query = query.Where("parent_id IS NULL")
+	} else {
+		query = query.Where("parent_id = ?", *targetID)
+	}
+	var existing File
+	if err := query.First(&existing).Error; err == nil {
+		return nil, fmt.Errorf("目标目录下已存在同名项目")
+	}
+
+	// 执行移动：只更新 parent_id
+	item.ParentID = targetID
+	if err := s.db.Save(&item).Error; err != nil {
+		return nil, err
+	}
+
+	return &item, nil
+}
+
+// checkNotDescendant 检查 targetID 不是 itemID 的后代（防止循环引用）
+func (s *Service) checkNotDescendant(itemID uint, targetID uint, userID uint) error {
+	currentID := targetID
+	visited := make(map[uint]bool)
+	for currentID != 0 {
+		if currentID == itemID {
+			return fmt.Errorf("不能移动到自身的子目录中")
+		}
+		if visited[currentID] {
+			break
+		}
+		visited[currentID] = true
+
+		var folder File
+		if err := s.db.Where("id = ? AND user_id = ?", currentID, userID).First(&folder).Error; err != nil {
+			break
+		}
+		if folder.ParentID == nil {
+			break
+		}
+		currentID = *folder.ParentID
+	}
+	return nil
+}
+
 // validateName 验证文件名是否符合规则
 func validateName(name string) error {
 	if name == "" {
