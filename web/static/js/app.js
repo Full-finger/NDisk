@@ -350,6 +350,14 @@ function downloadFile(id) {
     window.location.href = `/api/files/${id}/download`;
 }
 
+// 下载文件夹（ZIP 格式）
+function downloadFolder(id) {
+    if (!confirm('下载文件夹可能需要压缩过程，这会消耗一段时间，请您坐和放宽，下载马上开始。确认下载吗？')) {
+        return;
+    }
+    window.location.href = `/api/folders/${id}/download`;
+}
+
 // 退出登录
 function logout() {
     clearToken();
