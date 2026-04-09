@@ -10,4 +10,4 @@ test:
 	go test ./...
 
 clean:
-	rm -rf bin/ data/
+	rm -rf bin/* data/*
