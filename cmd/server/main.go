@@ -4,6 +4,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/Full-finger/NDisk/internal/auth"
@@ -32,7 +33,6 @@ func main() {
 
 	// 初始化存储
 	store := storage.NewLocal(cfg.Storage.Path)
-	_ = store
 
 	// 初始化认证模块
 	authService := auth.NewService(db, cfg.JWTSecret)
@@ -40,6 +40,10 @@ func main() {
 
 	// 初始化文件模块
 	fileService := file.NewService(db, store)
+	// ZIP 缓存目录: 与 storage 同级的 zip_cache 目录（如 data/zip_cache）
+	zipCacheDir := filepath.Join(filepath.Dir(cfg.Storage.Path), "zip_cache")
+	fileService.SetZipDir(zipCacheDir)
+	fileService.StartCacheCleaner() // 启动定时缓存清理
 	fileHandler := file.NewHandler(fileService, cfg.JWTSecret)
 
 	// 初始化 Web Handler
@@ -84,9 +88,11 @@ func main() {
 		authGroup.POST("/logout", authHandler.Logout)
 	}
 
-	// 下载路由（支持query参数token，不走JWT中间件）
+	// 下载路由（支持Cookie认证，不走JWT中间件）
 	r.GET("/api/files/:id/download", fileHandler.Download)
 	r.HEAD("/api/files/:id/download", fileHandler.DownloadHead)
+	r.GET("/api/folders/:id/download", fileHandler.DownloadFolder)
+	r.HEAD("/api/folders/:id/download", fileHandler.DownloadFolderHead)
 
 	// 受保护路由（需要 JWT）
 	api := r.Group("/api")

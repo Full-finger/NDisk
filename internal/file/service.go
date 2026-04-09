@@ -1,9 +1,14 @@
 package file
 
 import (
+	"archive/zip"
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -15,13 +20,20 @@ import (
 type Service struct {
 	db      *gorm.DB
 	storage storage.Storage
+	zipDir  string // ZIP 缓存目录
 }
 
-func NewService(db *gorm.DB, storage storage.Storage) *Service {
+func NewService(db *gorm.DB, storageObj storage.Storage) *Service {
 	return &Service{
 		db:      db,
-		storage: storage,
+		storage: storageObj,
 	}
+}
+
+// SetZipDir 设置 ZIP 缓存目录
+func (s *Service) SetZipDir(dir string) {
+	s.zipDir = dir
+	os.MkdirAll(dir, 0755)
 }
 
 // 上传文件
@@ -211,6 +223,9 @@ func (s *Service) Delete(userID uint, fileID uint) error {
 		s.storage.Delete(file.StorageKey)
 	}
 
+	// 使相关 ZIP 缓存失效
+	s.invalidateCacheForItem(userID, &file)
+
 	return s.db.Delete(&file).Error
 }
 
@@ -244,6 +259,9 @@ func (s *Service) Rename(userID uint, fileID uint, newName string) (*File, error
 	if err := s.db.Save(&file).Error; err != nil {
 		return nil, err
 	}
+
+	// 使相关 ZIP 缓存失效
+	s.invalidateCacheForItem(userID, &file)
 
 	return &file, nil
 }
@@ -326,6 +344,11 @@ func (s *Service) UploadFromChunks(userID uint, parentID *uint, filename string,
 		s.storage.Delete(chunkKey(identifier, i))
 	}
 
+	// 使父目录的 ZIP 缓存失效
+	if parentID != nil {
+		s.InvalidateFolderCache(*parentID)
+	}
+
 	return result, nil
 }
 
@@ -376,10 +399,25 @@ func (s *Service) Move(userID uint, itemID uint, targetID *uint) (*File, error) 
 		return nil, fmt.Errorf("目标目录下已存在同名项目")
 	}
 
+	// 保存旧的 parentID 用于缓存失效
+	oldParentID := item.ParentID
+
 	// 执行移动：只更新 parent_id
 	item.ParentID = targetID
 	if err := s.db.Save(&item).Error; err != nil {
 		return nil, err
+	}
+
+	// 使源目录和目标目录的 ZIP 缓存失效
+	if oldParentID != nil {
+		s.InvalidateFolderCache(*oldParentID)
+	} else {
+		s.invalidateRootCache(userID)
+	}
+	if targetID != nil {
+		s.InvalidateFolderCache(*targetID)
+	} else {
+		s.invalidateRootCache(userID)
 	}
 
 	return &item, nil
@@ -444,4 +482,300 @@ func validateName(name string) error {
 	}
 
 	return nil
+}
+
+// ==================== 文件夹下载（ZIP）相关方法 ====================
+
+// folderTreeItem 表示文件夹树中的一个文件条目
+type folderTreeItem struct {
+	RelPath string // 相对于根文件夹的路径
+	File    File   // 文件元数据
+}
+
+// getFolderTree 递归获取文件夹下所有文件（不包含子文件夹本身，只包含文件）
+func (s *Service) getFolderTree(userID uint, folderID uint, basePath string) ([]folderTreeItem, error) {
+	var items []folderTreeItem
+
+	// 获取该文件夹下的所有文件
+	var files []File
+	if err := s.db.Where("user_id = ? AND parent_id = ? AND is_dir = ?", userID, folderID, false).Find(&files).Error; err != nil {
+		return nil, err
+	}
+	for _, f := range files {
+		items = append(items, folderTreeItem{
+			RelPath: filepath.Join(basePath, f.Name),
+			File:    f,
+		})
+	}
+
+	// 递归获取子文件夹
+	var subFolders []File
+	if err := s.db.Where("user_id = ? AND parent_id = ? AND is_dir = ?", userID, folderID, true).Find(&subFolders).Error; err != nil {
+		return nil, err
+	}
+	for _, sf := range subFolders {
+		subItems, err := s.getFolderTree(userID, sf.ID, filepath.Join(basePath, sf.Name))
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, subItems...)
+	}
+
+	return items, nil
+}
+
+// computeContentHash 计算文件夹内容的哈希值，用于缓存失效检测
+func (s *Service) computeContentHash(userID uint, folderID uint) (string, error) {
+	items, err := s.getFolderTree(userID, folderID, "")
+	if err != nil {
+		return "", err
+	}
+
+	h := sha1.New()
+	// 按 RelPath 排序以确保确定性
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].RelPath < items[j].RelPath
+	})
+
+	for _, item := range items {
+		fmt.Fprintf(h, "%s:%d:%d:%d", item.RelPath, item.File.ID, item.File.Size, item.File.UpdatedAt.UnixNano())
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// zipCachePath 返回 ZIP 缓存文件路径
+func (s *Service) zipCachePath(folderID uint, contentHash string) string {
+	return filepath.Join(s.zipDir, fmt.Sprintf("%d_%s.zip", folderID, contentHash[:12]))
+}
+
+// findCachedZip 查找文件夹的缓存 ZIP 文件（匹配前缀），返回文件路径或空字符串
+func (s *Service) findCachedZip(folderID uint) string {
+	if s.zipDir == "" {
+		return ""
+	}
+	pattern := filepath.Join(s.zipDir, fmt.Sprintf("%d_*.zip", folderID))
+	matches, _ := filepath.Glob(pattern)
+	if len(matches) == 0 {
+		return ""
+	}
+	// 返回最新的匹配
+	latest := matches[0]
+	for _, m := range matches[1:] {
+		info1, _ := os.Stat(m)
+		info2, _ := os.Stat(latest)
+		if info1 != nil && info2 != nil && info1.ModTime().After(info2.ModTime()) {
+			latest = m
+		}
+	}
+	return latest
+}
+
+// GenerateFolderZip 生成文件夹的 ZIP 压缩包（带缓存）
+// 返回值：ZIP 文件路径、文件夹信息、是否来自缓存
+func (s *Service) GenerateFolderZip(userID uint, folderID uint) (string, *File, bool, error) {
+	// 获取文件夹信息
+	var folder File
+	if err := s.db.Where("id = ? AND user_id = ? AND is_dir = ?", folderID, userID, true).First(&folder).Error; err != nil {
+		return "", nil, false, fmt.Errorf("文件夹不存在")
+	}
+
+	// 计算内容哈希
+	contentHash, err := s.computeContentHash(userID, folderID)
+	if err != nil {
+		return "", nil, false, fmt.Errorf("计算内容哈希失败: %v", err)
+	}
+
+	// 检查缓存
+	expectedPath := s.zipCachePath(folderID, contentHash)
+	if _, err := os.Stat(expectedPath); err == nil {
+		// 缓存命中
+		return expectedPath, &folder, true, nil
+	}
+
+	// 缓存未命中，生成新的 ZIP
+	// 获取文件夹树
+	items, err := s.getFolderTree(userID, folderID, "")
+	if err != nil {
+		return "", nil, false, fmt.Errorf("获取文件夹内容失败: %v", err)
+	}
+
+	if len(items) == 0 {
+		return "", nil, false, fmt.Errorf("文件夹为空")
+	}
+
+	// 创建临时 ZIP 文件
+	tmpPath := expectedPath + ".tmp"
+	zipFile, err := os.Create(tmpPath)
+	if err != nil {
+		return "", nil, false, fmt.Errorf("创建临时文件失败: %v", err)
+	}
+
+	zipWriter := zip.NewWriter(zipFile)
+
+	for _, item := range items {
+		// 打开源文件
+		reader, err := s.storage.Open(item.File.StorageKey)
+		if err != nil {
+			zipWriter.Close()
+			zipFile.Close()
+			os.Remove(tmpPath)
+			return "", nil, false, fmt.Errorf("打开文件 %s 失败: %v", item.RelPath, err)
+		}
+
+		// 创建 ZIP 条目
+		w, err := zipWriter.Create(item.RelPath)
+		if err != nil {
+			reader.Close()
+			zipWriter.Close()
+			zipFile.Close()
+			os.Remove(tmpPath)
+			return "", nil, false, fmt.Errorf("创建 ZIP 条目失败: %v", err)
+		}
+
+		_, err = io.Copy(w, reader)
+		reader.Close()
+		if err != nil {
+			zipWriter.Close()
+			zipFile.Close()
+			os.Remove(tmpPath)
+			return "", nil, false, fmt.Errorf("写入文件 %s 到 ZIP 失败: %v", item.RelPath, err)
+		}
+	}
+
+	// 完成写入
+	if err := zipWriter.Close(); err != nil {
+		zipFile.Close()
+		os.Remove(tmpPath)
+		return "", nil, false, fmt.Errorf("关闭 ZIP 写入器失败: %v", err)
+	}
+	zipFile.Close()
+
+	// 删除旧缓存文件
+	s.cleanFolderCache(folderID)
+
+	// 重命名临时文件为正式文件
+	if err := os.Rename(tmpPath, expectedPath); err != nil {
+		os.Remove(tmpPath)
+		return "", nil, false, fmt.Errorf("重命名临时文件失败: %v", err)
+	}
+
+	return expectedPath, &folder, false, nil
+}
+
+// GetFolderZipInfo 获取 ZIP 缓存文件信息（用于 HEAD 请求）
+func (s *Service) GetFolderZipInfo(userID uint, folderID uint) (*File, int64, error) {
+	// 获取文件夹信息
+	var folder File
+	if err := s.db.Where("id = ? AND user_id = ? AND is_dir = ?", folderID, userID, true).First(&folder).Error; err != nil {
+		return nil, 0, fmt.Errorf("文件夹不存在")
+	}
+
+	// 查找缓存
+	cachedPath := s.findCachedZip(folderID)
+	if cachedPath == "" {
+		return &folder, 0, nil
+	}
+
+	info, err := os.Stat(cachedPath)
+	if err != nil {
+		return &folder, 0, nil
+	}
+
+	return &folder, info.Size(), nil
+}
+
+// OpenZipCache 打开 ZIP 缓存文件
+func (s *Service) OpenZipCache(path string) (*os.File, error) {
+	return os.Open(path)
+}
+
+// InvalidateFolderCache 使指定文件夹的 ZIP 缓存失效
+func (s *Service) InvalidateFolderCache(folderID uint) {
+	s.cleanFolderCache(folderID)
+}
+
+// invalidateRootCache 使根目录的缓存失效（通过遍历所有 parent_id IS NULL 的文件夹）
+func (s *Service) invalidateRootCache(userID uint) {
+	// 根目录不生成 ZIP，不需要处理
+}
+
+// invalidateCacheForItem 使与某个文件/文件夹相关的所有 ZIP 缓存失效
+// 包括其直接父文件夹以及所有祖先文件夹
+func (s *Service) invalidateCacheForItem(userID uint, item *File) {
+	// 使直接父目录的缓存失效
+	if item.ParentID != nil {
+		s.InvalidateFolderCache(*item.ParentID)
+		// 向上递归使祖先目录的缓存失效
+		s.invalidateAncestorCache(userID, *item.ParentID)
+	}
+	// 如果是文件夹，使自身的缓存也失效
+	if item.IsDir {
+		s.InvalidateFolderCache(item.ID)
+	}
+}
+
+// invalidateAncestorCache 递归使祖先文件夹的缓存失效
+func (s *Service) invalidateAncestorCache(userID uint, folderID uint) {
+	var folder File
+	if err := s.db.Where("id = ? AND user_id = ?", folderID, userID).First(&folder).Error; err != nil {
+		return
+	}
+	if folder.ParentID != nil {
+		s.InvalidateFolderCache(*folder.ParentID)
+		s.invalidateAncestorCache(userID, *folder.ParentID)
+	}
+}
+
+// cleanFolderCache 清除指定文件夹的所有 ZIP 缓存文件
+func (s *Service) cleanFolderCache(folderID uint) {
+	if s.zipDir == "" {
+		return
+	}
+	pattern := filepath.Join(s.zipDir, fmt.Sprintf("%d_*.zip", folderID))
+	matches, _ := filepath.Glob(pattern)
+	for _, m := range matches {
+		os.Remove(m)
+	}
+}
+
+// CleanExpiredCache 清理过期的 ZIP 缓存文件（超过 24 小时）
+func (s *Service) CleanExpiredCache() {
+	if s.zipDir == "" {
+		return
+	}
+
+	entries, err := os.ReadDir(s.zipDir)
+	if err != nil {
+		return
+	}
+
+	expiry := 24 * time.Hour
+	now := time.Now()
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".zip") {
+			continue
+		}
+
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		if now.Sub(info.ModTime()) > expiry {
+			os.Remove(filepath.Join(s.zipDir, entry.Name()))
+		}
+	}
+}
+
+// StartCacheCleaner 启动定时缓存清理 goroutine
+func (s *Service) StartCacheCleaner() {
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			s.CleanExpiredCache()
+		}
+	}()
 }

@@ -3,10 +3,13 @@ package file
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Full-finger/NDisk/internal/auth"
 	"github.com/gin-gonic/gin"
@@ -542,4 +545,179 @@ func (h *Handler) ListAllFolders(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"folders": folders})
+}
+
+// DownloadFolder 下载文件夹（ZIP 格式，支持 Range 断点续传）
+func (h *Handler) DownloadFolder(c *gin.Context) {
+	userID := c.GetUint("user_id")
+
+	// 如果没有通过中间件获取到userID，尝试从Cookie解析
+	if userID == 0 {
+		if tokenStr, err := c.Cookie("token"); err == nil && tokenStr != "" {
+			if claims, err := auth.ParseToken(tokenStr, h.jwtSecret); err == nil {
+				userID = claims.UserID
+			}
+		}
+	}
+
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	folderID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid folder id"})
+		return
+	}
+
+	// 生成或获取 ZIP 文件
+	zipPath, folder, fromCache, err := h.service.GenerateFolderZip(userID, uint(folderID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 获取文件信息
+	zipInfo, err := os.Stat(zipPath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "无法读取压缩文件"})
+		return
+	}
+
+	zipSize := zipInfo.Size()
+	zipName := folder.Name + ".zip"
+
+	// 设置通用头
+	c.Header("Accept-Ranges", "bytes")
+	c.Header("ETag", fmt.Sprintf(`"%x-%d"`, folderID, zipSize))
+	c.Header("Last-Modified", zipInfo.ModTime().UTC().Format(http.TimeFormat))
+	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(zipName))
+
+	// 解析Range头
+	rangeHeader := c.GetHeader("Range")
+	if rangeHeader == "" {
+		h.serveZipFull(c, zipPath, zipSize)
+		return
+	}
+
+	// 解析范围
+	ranges, err := parseRange(rangeHeader, zipSize)
+	if err != nil {
+		c.Header("Content-Range", fmt.Sprintf("bytes */%d", zipSize))
+		c.JSON(http.StatusRequestedRangeNotSatisfiable, gin.H{"error": "invalid range"})
+		return
+	}
+
+	if len(ranges) == 1 {
+		h.serveZipRange(c, zipPath, zipSize, ranges[0])
+	} else {
+		h.serveZipMultipleRanges(c, zipPath, zipSize, ranges)
+	}
+
+	// 记录日志
+	if !fromCache {
+		log.Printf("Generated ZIP for folder %d, size: %d bytes", folderID, zipSize)
+	}
+}
+
+// serveZipFull 返回完整 ZIP 文件
+func (h *Handler) serveZipFull(c *gin.Context, zipPath string, zipSize int64) {
+	f, err := os.Open(zipPath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "无法读取压缩文件"})
+		return
+	}
+	defer f.Close()
+
+	c.Header("Content-Type", "application/zip")
+	c.Header("Content-Length", strconv.FormatInt(zipSize, 10))
+	c.Status(http.StatusOK)
+	io.Copy(c.Writer, f)
+}
+
+// serveZipRange 返回单范围 ZIP 内容
+func (h *Handler) serveZipRange(c *gin.Context, zipPath string, zipSize int64, r httpRange) {
+	f, err := os.Open(zipPath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "无法读取压缩文件"})
+		return
+	}
+	defer f.Close()
+
+	if _, err := f.Seek(r.start, io.SeekStart); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "无法定位文件"})
+		return
+	}
+
+	c.Header("Content-Type", "application/zip")
+	c.Header("Content-Length", strconv.FormatInt(r.length, 10))
+	c.Header("Content-Range", fmt.Sprintf("bytes %d-%d/%d", r.start, r.start+r.length-1, zipSize))
+	c.Status(http.StatusPartialContent)
+	io.Copy(c.Writer, io.LimitReader(f, r.length))
+}
+
+// serveZipMultipleRanges 返回多范围 ZIP 内容
+func (h *Handler) serveZipMultipleRanges(c *gin.Context, zipPath string, zipSize int64, ranges []httpRange) {
+	boundary := fmt.Sprintf("BOUNDARY-ZIP-%d", time.Now().UnixNano())
+	c.Header("Content-Type", "multipart/byteranges; boundary="+boundary)
+	c.Status(http.StatusPartialContent)
+
+	for _, r := range ranges {
+		c.Writer.WriteString(fmt.Sprintf("\r\n--%s\r\n", boundary))
+		c.Writer.WriteString("Content-Type: application/zip\r\n")
+		c.Writer.WriteString(fmt.Sprintf("Content-Range: bytes %d-%d/%d\r\n\r\n", r.start, r.start+r.length-1, zipSize))
+
+		f, err := os.Open(zipPath)
+		if err != nil {
+			return
+		}
+		f.Seek(r.start, io.SeekStart)
+		io.Copy(c.Writer, io.LimitReader(f, r.length))
+		f.Close()
+	}
+	c.Writer.WriteString(fmt.Sprintf("\r\n--%s--\r\n", boundary))
+}
+
+// DownloadFolderHead 处理文件夹下载的 HEAD 请求
+func (h *Handler) DownloadFolderHead(c *gin.Context) {
+	userID := c.GetUint("user_id")
+
+	if userID == 0 {
+		if tokenStr, err := c.Cookie("token"); err == nil && tokenStr != "" {
+			if claims, err := auth.ParseToken(tokenStr, h.jwtSecret); err == nil {
+				userID = claims.UserID
+			}
+		}
+	}
+
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	folderID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid folder id"})
+		return
+	}
+
+	folder, zipSize, err := h.service.GetFolderZipInfo(userID, uint(folderID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	zipName := folder.Name + ".zip"
+	c.Header("Accept-Ranges", "bytes")
+	c.Header("ETag", fmt.Sprintf(`"%x-%d"`, folderID, zipSize))
+	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(zipName))
+	c.Header("Content-Type", "application/zip")
+
+	if zipSize > 0 {
+		c.Header("Content-Length", strconv.FormatInt(zipSize, 10))
+	} else {
+		c.Header("Content-Length", "0")
+	}
+	c.Status(http.StatusOK)
 }
