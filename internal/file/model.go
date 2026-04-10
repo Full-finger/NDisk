@@ -45,3 +45,14 @@ type RenameRequest struct {
 type MoveRequest struct {
 	TargetID *uint `json:"target_id"` // 目标文件夹ID，nil表示根目录
 }
+
+// DownloadLink 一次性下载短链接
+type DownloadLink struct {
+	ID        uint   `gorm:"primaryKey"`
+	UserID    uint   `gorm:"index"`
+	FileID    uint   `gorm:"index"`
+	IsFolder  bool   // 是否为文件夹下载
+	Token     string `gorm:"size:64;uniqueIndex"`
+	ExpiresAt time.Time
+	CreatedAt time.Time
+}

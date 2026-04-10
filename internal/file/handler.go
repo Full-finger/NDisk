@@ -11,11 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Full-finger/NDisk/internal/auth"
 	"github.com/gin-gonic/gin"
 )
 
-// httpRange 表示一个字节范围
 type httpRange struct {
 	start, length int64
 }
@@ -52,11 +50,10 @@ func (h *Handler) TestChunk(c *gin.Context) {
 	}
 }
 
-// 上传文件（支持 resumable.js 分块上传）
+// Upload 上传文件（支持 resumable.js 分块上传）
 func (h *Handler) Upload(c *gin.Context) {
 	userID := c.GetUint("user_id")
 
-	// 检查是否为 resumable.js 分块上传
 	chunkNumber := c.PostForm("resumableChunkNumber")
 	identifier := c.PostForm("resumableIdentifier")
 	totalSizeStr := c.PostForm("resumableTotalSize")
@@ -64,16 +61,13 @@ func (h *Handler) Upload(c *gin.Context) {
 	filename := c.PostForm("resumableFilename")
 
 	if chunkNumber != "" && identifier != "" {
-		// 分块上传模式
 		h.uploadChunk(c, userID, chunkNumber, identifier, totalSizeStr, totalChunksStr, filename)
 		return
 	}
 
-	// 普通整文件上传模式（向后兼容）
 	h.uploadWholeFile(c, userID)
 }
 
-// uploadChunk 处理分块上传
 func (h *Handler) uploadChunk(c *gin.Context, userID uint, chunkNumberStr, identifier, totalSizeStr, totalChunksStr, filename string) {
 	chunkNumber, err := strconv.Atoi(chunkNumberStr)
 	if err != nil {
@@ -93,14 +87,12 @@ func (h *Handler) uploadChunk(c *gin.Context, userID uint, chunkNumberStr, ident
 		return
 	}
 
-	// 获取上传的 chunk 文件
 	formFile, err := c.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "no file uploaded"})
 		return
 	}
 
-	// 打开文件流
 	file, err := formFile.Open()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot open file"})
@@ -108,15 +100,12 @@ func (h *Handler) uploadChunk(c *gin.Context, userID uint, chunkNumberStr, ident
 	}
 	defer file.Close()
 
-	// 保存分块
 	if err := h.service.SaveChunk(identifier, chunkNumber, file); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save chunk"})
 		return
 	}
 
-	// 检查是否所有分块都已上传
 	if h.service.AllChunksUploaded(identifier, totalChunks) {
-		// 获取 parent_id
 		var parentID *uint
 		if pid := c.PostForm("parent_id"); pid != "" {
 			if id, err := strconv.ParseUint(pid, 10, 32); err == nil {
@@ -125,7 +114,6 @@ func (h *Handler) uploadChunk(c *gin.Context, userID uint, chunkNumberStr, ident
 			}
 		}
 
-		// 合并所有分块
 		result, err := h.service.UploadFromChunks(userID, parentID, filename, totalSize, identifier, totalChunks)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -141,13 +129,10 @@ func (h *Handler) uploadChunk(c *gin.Context, userID uint, chunkNumberStr, ident
 		return
 	}
 
-	// 分块已保存，但未全部上传完成
 	c.JSON(http.StatusOK, gin.H{"message": "chunk uploaded"})
 }
 
-// uploadWholeFile 处理普通整文件上传（向后兼容）
 func (h *Handler) uploadWholeFile(c *gin.Context, userID uint) {
-	// 获取 parent_id（可选）
 	var parentID *uint
 	if pid := c.PostForm("parent_id"); pid != "" {
 		if id, err := strconv.ParseUint(pid, 10, 32); err == nil {
@@ -156,14 +141,12 @@ func (h *Handler) uploadWholeFile(c *gin.Context, userID uint) {
 		}
 	}
 
-	// 获取上传的文件
 	formFile, err := c.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "no file uploaded"})
 		return
 	}
 
-	// 打开文件流
 	file, err := formFile.Open()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot open file"})
@@ -171,7 +154,6 @@ func (h *Handler) uploadWholeFile(c *gin.Context, userID uint) {
 	}
 	defer file.Close()
 
-	// 上传
 	result, err := h.service.Upload(userID, parentID, formFile.Filename, formFile.Size, file)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -186,7 +168,7 @@ func (h *Handler) uploadWholeFile(c *gin.Context, userID uint) {
 	})
 }
 
-// 创建文件夹
+// CreateFolder 创建文件夹
 func (h *Handler) CreateFolder(c *gin.Context) {
 	userID := c.GetUint("user_id")
 
@@ -202,13 +184,10 @@ func (h *Handler) CreateFolder(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"id":   folder.ID,
-		"name": folder.Name,
-	})
+	c.JSON(http.StatusOK, gin.H{"id": folder.ID, "name": folder.Name})
 }
 
-// 获取文件列表
+// List 获取文件列表
 func (h *Handler) List(c *gin.Context) {
 	userID := c.GetUint("user_id")
 
@@ -226,32 +205,14 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 
-	// 同时获取目录列表
 	folders, _ := h.service.ListFolders(userID, parentID)
 
-	c.JSON(http.StatusOK, gin.H{
-		"folders": folders,
-		"files":   files,
-	})
+	c.JSON(http.StatusOK, gin.H{"folders": folders, "files": files})
 }
 
-// 下载文件（支持Range请求，从Cookie或Authorization header认证）
-func (h *Handler) Download(c *gin.Context) {
+// CreateDownloadLink 生成下载短链接（需要 JWT 认证）
+func (h *Handler) CreateDownloadLink(c *gin.Context) {
 	userID := c.GetUint("user_id")
-
-	// 如果没有通过中间件获取到userID，尝试从Cookie解析
-	if userID == 0 {
-		if tokenStr, err := c.Cookie("token"); err == nil && tokenStr != "" {
-			if claims, err := auth.ParseToken(tokenStr, h.jwtSecret); err == nil {
-				userID = claims.UserID
-			}
-		}
-	}
-
-	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
 
 	fileID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -259,33 +220,87 @@ func (h *Handler) Download(c *gin.Context) {
 		return
 	}
 
-	// 获取文件信息
-	file, err := h.service.GetFile(userID, uint(fileID))
+	// 验证文件归属
+	if _, err := h.service.GetFile(userID, uint(fileID)); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
+		return
+	}
+
+	link, err := h.service.CreateDownloadLink(userID, uint(fileID), false)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create download link"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"url": "/api/dl/" + link.Token})
+}
+
+// CreateFolderDownloadLink 生成文件夹下载短链接（需要 JWT 认证）
+func (h *Handler) CreateFolderDownloadLink(c *gin.Context) {
+	userID := c.GetUint("user_id")
+
+	folderID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid folder id"})
+		return
+	}
+
+	// 验证文件夹归属
+	var folder File
+	if err := h.service.db.Where("id = ? AND user_id = ? AND is_dir = ?", folderID, userID, true).First(&folder).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "folder not found"})
+		return
+	}
+
+	link, err := h.service.CreateDownloadLink(userID, uint(folderID), true)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create download link"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"url": "/api/dl/" + link.Token})
+}
+
+// DownloadByToken 通过短链接下载（无需认证）
+func (h *Handler) DownloadByToken(c *gin.Context) {
+	token := c.Param("token")
+	link := h.service.ValidateDownloadLink(token)
+	if link == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "download link expired or invalid"})
+		return
+	}
+
+	if link.IsFolder {
+		h.downloadFolderByLink(c, link)
+	} else {
+		h.downloadFileByLink(c, link)
+	}
+}
+
+// downloadFileByLink 通过短链接下载文件
+func (h *Handler) downloadFileByLink(c *gin.Context, link *DownloadLink) {
+	file, err := h.service.GetFile(link.UserID, link.FileID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
 		return
 	}
 
-	// 设置通用头
 	c.Header("Accept-Ranges", "bytes")
 	c.Header("ETag", file.ETag())
 	c.Header("Last-Modified", file.LastModified())
 	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(file.Name))
 
-	// 解析Range头
 	rangeHeader := c.GetHeader("Range")
 	if rangeHeader == "" {
 		h.serveFullFile(c, file)
 		return
 	}
 
-	// 检查If-Range
 	if !h.checkIfRange(c, file) {
 		h.serveFullFile(c, file)
 		return
 	}
 
-	// 解析范围
 	ranges, err := parseRange(rangeHeader, file.Size)
 	if err != nil {
 		c.Header("Content-Range", fmt.Sprintf("bytes */%d", file.Size))
@@ -297,6 +312,52 @@ func (h *Handler) Download(c *gin.Context) {
 		h.serveSingleRange(c, file, ranges[0])
 	} else {
 		h.serveMultipleRanges(c, file, ranges)
+	}
+}
+
+// downloadFolderByLink 通过短链接下载文件夹
+func (h *Handler) downloadFolderByLink(c *gin.Context, link *DownloadLink) {
+	zipPath, folder, fromCache, err := h.service.GenerateFolderZip(link.UserID, link.FileID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	zipInfo, err := os.Stat(zipPath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "无法读取压缩文件"})
+		return
+	}
+
+	zipSize := zipInfo.Size()
+	zipName := folder.Name + ".zip"
+
+	c.Header("Accept-Ranges", "bytes")
+	c.Header("ETag", fmt.Sprintf(`"%x-%d"`, link.FileID, zipSize))
+	c.Header("Last-Modified", zipInfo.ModTime().UTC().Format(http.TimeFormat))
+	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(zipName))
+
+	rangeHeader := c.GetHeader("Range")
+	if rangeHeader == "" {
+		h.serveZipFull(c, zipPath, zipSize)
+		return
+	}
+
+	ranges, err := parseRange(rangeHeader, zipSize)
+	if err != nil {
+		c.Header("Content-Range", fmt.Sprintf("bytes */%d", zipSize))
+		c.JSON(http.StatusRequestedRangeNotSatisfiable, gin.H{"error": "invalid range"})
+		return
+	}
+
+	if len(ranges) == 1 {
+		h.serveZipRange(c, zipPath, zipSize, ranges[0])
+	} else {
+		h.serveZipMultipleRanges(c, zipPath, zipSize, ranges)
+	}
+
+	if !fromCache {
+		log.Printf("Generated ZIP for folder %d, size: %d bytes", link.FileID, zipSize)
 	}
 }
 
@@ -315,7 +376,6 @@ func (h *Handler) serveFullFile(c *gin.Context, file *File) {
 	io.Copy(c.Writer, reader)
 }
 
-// serveSingleRange 返回单范围内容
 func (h *Handler) serveSingleRange(c *gin.Context, file *File, r httpRange) {
 	_, reader, err := h.service.DownloadRange(file.UserID, file.ID, r.start, r.length)
 	if err != nil {
@@ -331,7 +391,6 @@ func (h *Handler) serveSingleRange(c *gin.Context, file *File, r httpRange) {
 	io.Copy(c.Writer, reader)
 }
 
-// serveMultipleRanges 返回多范围内容
 func (h *Handler) serveMultipleRanges(c *gin.Context, file *File, ranges []httpRange) {
 	boundary := fmt.Sprintf("BOUNDARY-%d", file.ID)
 	c.Header("Content-Type", "multipart/byteranges; boundary="+boundary)
@@ -352,24 +411,20 @@ func (h *Handler) serveMultipleRanges(c *gin.Context, file *File, ranges []httpR
 	c.Writer.WriteString(fmt.Sprintf("\r\n--%s--\r\n", boundary))
 }
 
-// checkIfRange 检查If-Range条件（支持ETag和Last-Modified）
 func (h *Handler) checkIfRange(c *gin.Context, file *File) bool {
 	ifRange := c.GetHeader("If-Range")
 	if ifRange == "" {
 		return true
 	}
-	// ETag匹配（支持带引号和不带引号）
 	if strings.Trim(ifRange, `"`) == strings.Trim(file.ETag(), `"`) {
 		return true
 	}
-	// Last-Modified匹配
 	if ifRange == file.LastModified() {
 		return true
 	}
 	return false
 }
 
-// parseRange 解析Range头
 func parseRange(rangeHeader string, fileSize int64) ([]httpRange, error) {
 	if !strings.HasPrefix(rangeHeader, "bytes=") {
 		return nil, fmt.Errorf("invalid range header")
@@ -393,7 +448,6 @@ func parseRange(rangeHeader string, fileSize int64) ([]httpRange, error) {
 		var err error
 
 		if parts[0] == "" {
-			// -500: 最后500字节
 			end, err = strconv.ParseInt(parts[1], 10, 64)
 			if err != nil {
 				return nil, err
@@ -404,14 +458,12 @@ func parseRange(rangeHeader string, fileSize int64) ([]httpRange, error) {
 			start = fileSize - end
 			end = fileSize - 1
 		} else if parts[1] == "" {
-			// 500-: 从500到结尾
 			start, err = strconv.ParseInt(parts[0], 10, 64)
 			if err != nil {
 				return nil, err
 			}
 			end = fileSize - 1
 		} else {
-			// 0-499: 前500字节
 			start, err = strconv.ParseInt(parts[0], 10, 64)
 			if err != nil {
 				return nil, err
@@ -440,31 +492,7 @@ func parseRange(rangeHeader string, fileSize int64) ([]httpRange, error) {
 	return ranges, nil
 }
 
-// DownloadHead 处理HEAD请求，只返回文件信息不返回内容
-func (h *Handler) DownloadHead(c *gin.Context) {
-	userID := c.GetUint("user_id")
-	fileID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid file id"})
-		return
-	}
-
-	file, err := h.service.GetFile(userID, uint(fileID))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
-		return
-	}
-
-	c.Header("Accept-Ranges", "bytes")
-	c.Header("ETag", file.ETag())
-	c.Header("Last-Modified", file.LastModified())
-	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(file.Name))
-	c.Header("Content-Type", "application/octet-stream")
-	c.Header("Content-Length", strconv.FormatInt(file.Size, 10))
-	c.Status(http.StatusOK)
-}
-
-// 删除文件
+// Delete 删除文件
 func (h *Handler) Delete(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	fileID, err := strconv.ParseUint(c.Param("id"), 10, 32)
@@ -481,7 +509,7 @@ func (h *Handler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }
 
-// 重命名文件或文件夹
+// Rename 重命名
 func (h *Handler) Rename(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	fileID, err := strconv.ParseUint(c.Param("id"), 10, 32)
@@ -502,13 +530,10 @@ func (h *Handler) Rename(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"id":   file.ID,
-		"name": file.Name,
-	})
+	c.JSON(http.StatusOK, gin.H{"id": file.ID, "name": file.Name})
 }
 
-// 移动文件或文件夹
+// Move 移动
 func (h *Handler) Move(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	fileID, err := strconv.ParseUint(c.Param("id"), 10, 32)
@@ -529,14 +554,10 @@ func (h *Handler) Move(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"id":        file.ID,
-		"name":      file.Name,
-		"parent_id": file.ParentID,
-	})
+	c.JSON(http.StatusOK, gin.H{"id": file.ID, "name": file.Name, "parent_id": file.ParentID})
 }
 
-// ListAllFolders 获取所有文件夹（用于移动目标选择）
+// ListAllFolders 获取所有文件夹
 func (h *Handler) ListAllFolders(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	folders, err := h.service.ListAllFolders(userID)
@@ -545,80 +566,6 @@ func (h *Handler) ListAllFolders(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"folders": folders})
-}
-
-// DownloadFolder 下载文件夹（ZIP 格式，支持 Range 断点续传）
-func (h *Handler) DownloadFolder(c *gin.Context) {
-	userID := c.GetUint("user_id")
-
-	// 如果没有通过中间件获取到userID，尝试从Cookie解析
-	if userID == 0 {
-		if tokenStr, err := c.Cookie("token"); err == nil && tokenStr != "" {
-			if claims, err := auth.ParseToken(tokenStr, h.jwtSecret); err == nil {
-				userID = claims.UserID
-			}
-		}
-	}
-
-	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-
-	folderID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid folder id"})
-		return
-	}
-
-	// 生成或获取 ZIP 文件
-	zipPath, folder, fromCache, err := h.service.GenerateFolderZip(userID, uint(folderID))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// 获取文件信息
-	zipInfo, err := os.Stat(zipPath)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "无法读取压缩文件"})
-		return
-	}
-
-	zipSize := zipInfo.Size()
-	zipName := folder.Name + ".zip"
-
-	// 设置通用头
-	c.Header("Accept-Ranges", "bytes")
-	c.Header("ETag", fmt.Sprintf(`"%x-%d"`, folderID, zipSize))
-	c.Header("Last-Modified", zipInfo.ModTime().UTC().Format(http.TimeFormat))
-	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(zipName))
-
-	// 解析Range头
-	rangeHeader := c.GetHeader("Range")
-	if rangeHeader == "" {
-		h.serveZipFull(c, zipPath, zipSize)
-		return
-	}
-
-	// 解析范围
-	ranges, err := parseRange(rangeHeader, zipSize)
-	if err != nil {
-		c.Header("Content-Range", fmt.Sprintf("bytes */%d", zipSize))
-		c.JSON(http.StatusRequestedRangeNotSatisfiable, gin.H{"error": "invalid range"})
-		return
-	}
-
-	if len(ranges) == 1 {
-		h.serveZipRange(c, zipPath, zipSize, ranges[0])
-	} else {
-		h.serveZipMultipleRanges(c, zipPath, zipSize, ranges)
-	}
-
-	// 记录日志
-	if !fromCache {
-		log.Printf("Generated ZIP for folder %d, size: %d bytes", folderID, zipSize)
-	}
 }
 
 // serveZipFull 返回完整 ZIP 文件
@@ -636,7 +583,6 @@ func (h *Handler) serveZipFull(c *gin.Context, zipPath string, zipSize int64) {
 	io.Copy(c.Writer, f)
 }
 
-// serveZipRange 返回单范围 ZIP 内容
 func (h *Handler) serveZipRange(c *gin.Context, zipPath string, zipSize int64, r httpRange) {
 	f, err := os.Open(zipPath)
 	if err != nil {
@@ -657,7 +603,6 @@ func (h *Handler) serveZipRange(c *gin.Context, zipPath string, zipSize int64, r
 	io.Copy(c.Writer, io.LimitReader(f, r.length))
 }
 
-// serveZipMultipleRanges 返回多范围 ZIP 内容
 func (h *Handler) serveZipMultipleRanges(c *gin.Context, zipPath string, zipSize int64, ranges []httpRange) {
 	boundary := fmt.Sprintf("BOUNDARY-ZIP-%d", time.Now().UnixNano())
 	c.Header("Content-Type", "multipart/byteranges; boundary="+boundary)
@@ -677,47 +622,4 @@ func (h *Handler) serveZipMultipleRanges(c *gin.Context, zipPath string, zipSize
 		f.Close()
 	}
 	c.Writer.WriteString(fmt.Sprintf("\r\n--%s--\r\n", boundary))
-}
-
-// DownloadFolderHead 处理文件夹下载的 HEAD 请求
-func (h *Handler) DownloadFolderHead(c *gin.Context) {
-	userID := c.GetUint("user_id")
-
-	if userID == 0 {
-		if tokenStr, err := c.Cookie("token"); err == nil && tokenStr != "" {
-			if claims, err := auth.ParseToken(tokenStr, h.jwtSecret); err == nil {
-				userID = claims.UserID
-			}
-		}
-	}
-
-	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-
-	folderID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid folder id"})
-		return
-	}
-
-	folder, zipSize, err := h.service.GetFolderZipInfo(userID, uint(folderID))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		return
-	}
-
-	zipName := folder.Name + ".zip"
-	c.Header("Accept-Ranges", "bytes")
-	c.Header("ETag", fmt.Sprintf(`"%x-%d"`, folderID, zipSize))
-	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(zipName))
-	c.Header("Content-Type", "application/zip")
-
-	if zipSize > 0 {
-		c.Header("Content-Length", strconv.FormatInt(zipSize, 10))
-	} else {
-		c.Header("Content-Length", "0")
-	}
-	c.Status(http.StatusOK)
 }

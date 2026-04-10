@@ -2,6 +2,7 @@ package file
 
 import (
 	"archive/zip"
+	"crypto/rand"
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
@@ -776,6 +777,46 @@ func (s *Service) StartCacheCleaner() {
 		defer ticker.Stop()
 		for range ticker.C {
 			s.CleanExpiredCache()
+			s.CleanExpiredDownloadLinks()
 		}
 	}()
+}
+
+// ==================== 下载短链接 ====================
+
+const DownloadLinkExpiry = 5 * time.Minute
+
+// CreateDownloadLink 为文件创建下载短链接
+func (s *Service) CreateDownloadLink(userID uint, fileID uint, isFolder bool) (*DownloadLink, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return nil, err
+	}
+	token := hex.EncodeToString(b)
+
+	link := &DownloadLink{
+		UserID:    userID,
+		FileID:    fileID,
+		IsFolder:  isFolder,
+		Token:     token,
+		ExpiresAt: time.Now().Add(DownloadLinkExpiry),
+	}
+	if err := s.db.Create(link).Error; err != nil {
+		return nil, err
+	}
+	return link, nil
+}
+
+// ValidateDownloadLink 验证下载链接，返回 link 或 nil
+func (s *Service) ValidateDownloadLink(token string) *DownloadLink {
+	var link DownloadLink
+	if err := s.db.Where("token = ? AND expires_at > ?", token, time.Now()).First(&link).Error; err != nil {
+		return nil
+	}
+	return &link
+}
+
+// CleanExpiredDownloadLinks 清理过期的下载链接
+func (s *Service) CleanExpiredDownloadLinks() {
+	s.db.Where("expires_at < ?", time.Now()).Delete(&DownloadLink{})
 }

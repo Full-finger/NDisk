@@ -39,11 +39,10 @@ func (h *Handler) RegisterPage(c *gin.Context) {
 
 // FilesPage 渲染文件管理页面（需要认证）
 func (h *Handler) FilesPage(c *gin.Context) {
-	// 从上下文获取用户信息（由中间件注入）
 	userID := c.GetUint("user_id")
 	username := c.GetString("username")
+	accessToken := c.GetString("access_token")
 
-	// 获取文件列表
 	var parentID *uint
 	if pid := c.Query("parent_id"); pid != "" {
 		if id, err := strconv.ParseUint(pid, 10, 32); err == nil {
@@ -54,42 +53,55 @@ func (h *Handler) FilesPage(c *gin.Context) {
 
 	files, _ := h.fileService.List(userID, parentID)
 	folders, _ := h.fileService.ListFolders(userID, parentID)
-
-	// 获取面包屑导航路径
 	breadcrumb, _ := h.fileService.GetBreadcrumb(userID, parentID)
 
 	c.HTML(http.StatusOK, "files", gin.H{
-		"title":      "文件管理",
-		"username":   username,
-		"files":      files,
-		"folders":    folders,
-		"parentID":   parentID,
-		"breadcrumb": breadcrumb,
+		"title":       "文件管理",
+		"username":    username,
+		"files":       files,
+		"folders":     folders,
+		"parentID":    parentID,
+		"breadcrumb":  breadcrumb,
+		"accessToken": accessToken,
 	})
 }
 
-// CookieAuthMiddleware 从 Cookie 验证 JWT 的中间件（用于页面路由）
+// CookieAuthMiddleware 从 refresh token cookie 验证并生成 access token 注入页面
 func (h *Handler) CookieAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 从 Cookie 获取 token
-		token, err := c.Cookie("token")
-		if err != nil || token == "" {
+		refreshToken, err := c.Cookie("refresh_token")
+		if err != nil || refreshToken == "" {
 			c.Redirect(http.StatusFound, "/login")
 			c.Abort()
 			return
 		}
 
-		// 验证 token
-		claims, err := auth.ParseToken(token, h.jwtSecret)
+		userID, err := h.authService.ValidateRefreshToken(refreshToken)
+		if err != nil {
+			c.SetCookie("refresh_token", "", -1, "/", "", false, true)
+			c.Redirect(http.StatusFound, "/login")
+			c.Abort()
+			return
+		}
+
+		user, err := h.authService.GetUserByID(userID)
 		if err != nil {
 			c.Redirect(http.StatusFound, "/login")
 			c.Abort()
 			return
 		}
 
-		// 设置用户信息到上下文
-		c.Set("user_id", claims.UserID)
-		c.Set("username", claims.Username)
+		// 生成新的 access token 注入到 context，供模板使用
+		accessToken, err := h.authService.GenerateAccessToken(user.ID, user.Username)
+		if err != nil {
+			c.Redirect(http.StatusFound, "/login")
+			c.Abort()
+			return
+		}
+
+		c.Set("user_id", user.ID)
+		c.Set("username", user.Username)
+		c.Set("access_token", accessToken)
 
 		c.Next()
 	}

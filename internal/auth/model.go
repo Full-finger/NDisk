@@ -27,10 +27,21 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+// RefreshToken 刷新令牌（存储在数据库中）
+type RefreshToken struct {
+	ID        uint   `gorm:"primaryKey"`
+	UserID    uint   `gorm:"index"`
+	Token     string `gorm:"size:64;uniqueIndex"` // SHA256 哈希
+	ExpiresAt time.Time
+	Revoked   bool
+	CreatedAt time.Time
+}
+
 // 登录响应
 type LoginResponse struct {
-	Token string   `json:"token"`
-	User  UserInfo `json:"user"`
+	AccessToken  string   `json:"access_token"`
+	RefreshToken string   `json:"-"` // 仅内部使用，通过 cookie 设置
+	User         UserInfo `json:"user"`
 }
 
 type UserInfo struct {

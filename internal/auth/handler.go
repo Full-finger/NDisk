@@ -7,7 +7,6 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-// translateValidationErrors 将 gin 的验证错误翻译成中文
 func translateValidationErrors(err error) string {
 	errs, ok := err.(validator.ValidationErrors)
 	if !ok {
@@ -80,18 +79,57 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	// 设置安全的 Cookie
-	// 参数: name, value, maxAge, path, domain, secure, httpOnly
-	// secure=true 需要 HTTPS，httpOnly=true 防止 XSS 读取 Cookie
-	isSecure := c.Request.TLS != nil // 如果是 HTTPS 则启用 secure
-	c.SetCookie("token", resp.Token, 86400, "/", "", isSecure, true)
+	// 设置 refresh token 到 HttpOnly Cookie
+	isSecure := c.Request.TLS != nil
+	c.SetCookie("refresh_token", resp.RefreshToken, 7*24*3600, "/", "", isSecure, true)
+	c.SetSameSite(http.SameSiteLaxMode)
 
 	c.JSON(http.StatusOK, resp)
 }
 
+// Refresh 用 refresh token cookie 换取新的 access token
+func (h *Handler) Refresh(c *gin.Context) {
+	refreshToken, err := c.Cookie("refresh_token")
+	if err != nil || refreshToken == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing refresh token"})
+		return
+	}
+
+	userID, err := h.service.ValidateRefreshToken(refreshToken)
+	if err != nil {
+		// 无效 token，清除 cookie
+		c.SetCookie("refresh_token", "", -1, "/", "", false, true)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 获取用户信息
+	user, err := h.service.GetUserByID(userID)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+		return
+	}
+
+	accessToken, err := h.service.GenerateAccessToken(user.ID, user.Username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"access_token": accessToken,
+		"user": UserInfo{
+			ID:       user.ID,
+			Username: user.Username,
+		},
+	})
+}
+
 // Logout 登出处理
 func (h *Handler) Logout(c *gin.Context) {
-	// 清除 Cookie
-	c.SetCookie("token", "", -1, "/", "", false, true)
+	if refreshToken, err := c.Cookie("refresh_token"); err == nil && refreshToken != "" {
+		h.service.RevokeRefreshToken(refreshToken)
+	}
+	c.SetCookie("refresh_token", "", -1, "/", "", false, true)
 	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
 }

@@ -22,42 +22,32 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// 初始化数据库
 	db, err := database.New(cfg)
 	if err != nil {
 		log.Fatal("failed to connect database:", err)
 	}
 
 	// 自动迁移
-	db.AutoMigrate(&auth.User{})
+	db.AutoMigrate(&auth.User{}, &auth.RefreshToken{}, &file.File{}, &file.DownloadLink{})
 
-	// 初始化存储
 	store := storage.NewLocal(cfg.Storage.Path)
 
-	// 初始化认证模块
 	authService := auth.NewService(db, cfg.JWTSecret)
 	authHandler := auth.NewHandler(authService)
 
-	// 初始化文件模块
 	fileService := file.NewService(db, store)
-	// ZIP 缓存目录: 与 storage 同级的 zip_cache 目录（如 data/zip_cache）
 	zipCacheDir := filepath.Join(filepath.Dir(cfg.Storage.Path), "zip_cache")
 	fileService.SetZipDir(zipCacheDir)
-	fileService.StartCacheCleaner() // 启动定时缓存清理
+	fileService.StartCacheCleaner()
 	fileHandler := file.NewHandler(fileService, cfg.JWTSecret)
 
-	// 初始化 Web Handler
 	webHandler := web.NewHandler(authService, fileService, cfg.JWTSecret)
-
-	db.AutoMigrate(&auth.User{}, &file.File{})
 
 	r := gin.Default()
 
-	// 加载模板
 	tmpl := template.Must(template.ParseGlob("web/templates/*.html"))
 	r.SetHTMLTemplate(tmpl)
 
-	// 静态文件服务
 	r.Static("/static", "web/static")
 
 	// 公开路由
@@ -69,32 +59,27 @@ func main() {
 	r.GET("/login", webHandler.LoginPage)
 	r.GET("/register", webHandler.RegisterPage)
 
-	// 页面路由（需要认证）
+	// 页面路由（需要认证 - refresh token cookie）
 	filesGroup := r.Group("/files")
 	filesGroup.Use(webHandler.CookieAuthMiddleware())
 	{
 		filesGroup.GET("", webHandler.FilesPage)
 	}
 
-	// 创建速率限制器：每分钟最多 5 次登录/注册尝试
+	// 认证路由
 	authRateLimiter := auth.NewRateLimiter(5, time.Minute)
-
-	// 认证路由（无需 JWT）
 	authGroup := r.Group("/api/auth")
 	{
-		// 注册和登录接口应用速率限制
 		authGroup.POST("/register", auth.RateLimitMiddleware(authRateLimiter), authHandler.Register)
 		authGroup.POST("/login", auth.RateLimitMiddleware(authRateLimiter), authHandler.Login)
+		authGroup.POST("/refresh", authHandler.Refresh)
 		authGroup.POST("/logout", authHandler.Logout)
 	}
 
-	// 下载路由（支持Cookie认证，不走JWT中间件）
-	r.GET("/api/files/:id/download", fileHandler.Download)
-	r.HEAD("/api/files/:id/download", fileHandler.DownloadHead)
-	r.GET("/api/folders/:id/download", fileHandler.DownloadFolder)
-	r.HEAD("/api/folders/:id/download", fileHandler.DownloadFolderHead)
+	// 下载短链接（无需认证）
+	r.GET("/api/dl/:token", fileHandler.DownloadByToken)
 
-	// 受保护路由（需要 JWT）
+	// 受保护路由（需要 access token JWT）
 	api := r.Group("/api")
 	api.Use(auth.JWTMiddleware(cfg.JWTSecret))
 	{
@@ -105,7 +90,6 @@ func main() {
 			})
 		})
 
-		// 文件路由
 		api.POST("/files/upload", fileHandler.Upload)
 		api.GET("/files/upload", fileHandler.TestChunk)
 		api.GET("/files", fileHandler.List)
@@ -114,6 +98,10 @@ func main() {
 		api.PUT("/files/:id/rename", fileHandler.Rename)
 		api.PUT("/files/:id/move", fileHandler.Move)
 		api.GET("/folders/all", fileHandler.ListAllFolders)
+
+		// 下载链接生成（需要认证）
+		api.POST("/files/:id/download-link", fileHandler.CreateDownloadLink)
+		api.POST("/folders/:id/download-link", fileHandler.CreateFolderDownloadLink)
 	}
 
 	// 首页重定向到登录页

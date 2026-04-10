@@ -1,77 +1,87 @@
-// 获取存储的 token
-function getToken() {
-    return localStorage.getItem('token');
+// ========== Token 管理（仅内存） ==========
+
+var _accessToken = window.__ACCESS_TOKEN__ || '';
+
+function getAccessToken() {
+    return _accessToken;
 }
 
-// 设置 token
-function setToken(token) {
-    localStorage.setItem('token', token);
-    // 同时设置 cookie 用于页面访问
-    document.cookie = `token=${token}; path=/; max-age=86400`;
+function setAccessToken(token) {
+    _accessToken = token;
 }
 
-// 清除 token
-function clearToken() {
-    localStorage.removeItem('token');
-    // 清除 cookie
-    document.cookie = 'token=; path=/; max-age=0';
-}
-
-// 获取 Authorization header
 function getAuthHeader() {
-    const token = getToken();
-    return token ? { 'Authorization': `Bearer ${token}` } : {};
+    var token = getAccessToken();
+    return token ? { 'Authorization': 'Bearer ' + token } : {};
 }
 
-// 显示错误消息
+// 带自动刷新的 fetch 封装
+function authFetch(url, options) {
+    options = options || {};
+    var headers = Object.assign({}, options.headers || {}, getAuthHeader());
+    options.headers = headers;
+
+    return fetch(url, options).then(function(response) {
+        if (response.status === 401 && _accessToken) {
+            // access token 过期，尝试刷新
+            return fetch('/api/auth/refresh', { method: 'POST' }).then(function(refreshRes) {
+                if (refreshRes.ok) {
+                    return refreshRes.json().then(function(data) {
+                        setAccessToken(data.access_token);
+                        // 重试原请求
+                        headers = Object.assign({}, options.headers || {}, getAuthHeader());
+                        options.headers = headers;
+                        return fetch(url, options);
+                    });
+                }
+                // refresh 也失败，跳转登录
+                window.location.href = '/login';
+                return Promise.reject(new Error('session expired'));
+            });
+        }
+        return response;
+    });
+}
+
+// ========== 消息提示 ==========
+
 function showError(message) {
-    const errorEl = document.getElementById('error-message');
+    var errorEl = document.getElementById('error-message');
     if (errorEl) {
         errorEl.textContent = message;
         errorEl.classList.remove('hidden');
-        setTimeout(() => errorEl.classList.add('hidden'), 5000);
+        setTimeout(function() { errorEl.classList.add('hidden'); }, 5000);
     }
 }
 
-// 显示成功消息
 function showSuccess(message) {
-    const successEl = document.getElementById('success-message');
+    var successEl = document.getElementById('success-message');
     if (successEl) {
         successEl.textContent = message;
         successEl.classList.remove('hidden');
-        setTimeout(() => successEl.classList.add('hidden'), 5000);
+        setTimeout(function() { successEl.classList.add('hidden'); }, 5000);
     }
 }
 
-// 显示消息（文件页面）
-function showMessage(message, isError = false) {
-    const messageEl = document.getElementById('message');
+function showMessage(message, isError) {
+    var messageEl = document.getElementById('message');
     if (messageEl) {
         messageEl.textContent = message;
         messageEl.classList.remove('hidden');
-        messageEl.className = `mb-4 p-3 rounded-md ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
-        setTimeout(() => messageEl.classList.add('hidden'), 5000);
+        messageEl.className = 'mb-4 p-3 rounded-md ' + (isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700');
+        setTimeout(function() { messageEl.classList.add('hidden'); }, 5000);
     }
 }
 
 // ========== 上传进度水波球 ==========
-function getProgressBall() {
-    return document.getElementById('upload-progress-ball');
-}
 
-function getProgressWater() {
-    return document.querySelector('#upload-progress-ball .water');
-}
-
-function getProgressText() {
-    return document.querySelector('#upload-progress-ball .percent-text');
-}
+function getProgressBall() { return document.getElementById('upload-progress-ball'); }
+function getProgressWater() { return document.querySelector('#upload-progress-ball .water'); }
+function getProgressText() { return document.querySelector('#upload-progress-ball .percent-text'); }
 
 function showProgressBall() {
     var ball = getProgressBall();
-    if (ball) {
-        ball.classList.add('visible');
-    }
+    if (ball) ball.classList.add('visible');
     updateProgressBall(0);
 }
 
@@ -79,20 +89,13 @@ function hideProgressBall(delay) {
     delay = delay || 0;
     setTimeout(function() {
         var ball = getProgressBall();
-        if (ball) {
-            ball.classList.remove('visible');
-        }
-        // 重置状态
+        if (ball) ball.classList.remove('visible');
         setTimeout(function() {
             updateProgressBall(0);
             var water = getProgressWater();
-            if (water) {
-                water.style.background = 'linear-gradient(180deg, #5ca0e8 0%, #2670c4 100%)';
-            }
+            if (water) water.style.background = 'linear-gradient(180deg, #5ca0e8 0%, #2670c4 100%)';
             var text = getProgressText();
-            if (text) {
-                text.style.color = '#3b82f6';
-            }
+            if (text) text.style.color = '#3b82f6';
         }, 500);
     }, delay);
 }
@@ -100,56 +103,39 @@ function hideProgressBall(delay) {
 function updateProgressBall(percent) {
     var water = getProgressWater();
     var text = getProgressText();
-    if (water) {
-        water.style.height = percent + '%';
-    }
+    if (water) water.style.height = percent + '%';
     if (text) {
         text.textContent = Math.round(percent) + '%';
-        // 进度高于 50% 时文字变白色以保持可读性
-        if (percent > 50) {
-            text.style.color = '#ffffff';
-        } else {
-            text.style.color = '#3b82f6';
-        }
+        text.style.color = percent > 50 ? '#ffffff' : '#3b82f6';
     }
 }
 
 function setProgressBallError() {
     var water = getProgressWater();
     var text = getProgressText();
-    if (water) {
-        water.style.background = 'linear-gradient(180deg, #f87171 0%, #dc2626 100%)';
-    }
-    if (text) {
-        text.style.color = '#ffffff';
-        text.textContent = '失败';
-    }
+    if (water) water.style.background = 'linear-gradient(180deg, #f87171 0%, #dc2626 100%)';
+    if (text) { text.style.color = '#ffffff'; text.textContent = '失败'; }
 }
-// ========== 上传进度水波球 END ==========
 
-// 登录处理
+// ========== 登录/注册 ==========
+
 document.addEventListener('DOMContentLoaded', function() {
-    const loginForm = document.getElementById('login-form');
+    var loginForm = document.getElementById('login-form');
     if (loginForm) {
         loginForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            
+            var username = document.getElementById('username').value;
+            var password = document.getElementById('password').value;
+
             try {
-                const response = await fetch('/api/auth/login', {
+                var response = await fetch('/api/auth/login', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ username, password }),
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: username, password: password }),
                 });
-                
-                const data = await response.json();
-                
+                var data = await response.json();
                 if (response.ok) {
-                    setToken(data.token);
+                    setAccessToken(data.access_token);
                     window.location.href = '/files';
                 } else {
                     showError(data.error || '登录失败');
@@ -159,38 +145,30 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    
-    // 注册处理
-    const registerForm = document.getElementById('register-form');
+
+    var registerForm = document.getElementById('register-form');
     if (registerForm) {
         registerForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const confirmPassword = document.getElementById('confirm-password').value;
-            
+            var username = document.getElementById('username').value;
+            var password = document.getElementById('password').value;
+            var confirmPassword = document.getElementById('confirm-password').value;
+
             if (password !== confirmPassword) {
                 showError('两次输入的密码不一致');
                 return;
             }
-            
+
             try {
-                const response = await fetch('/api/auth/register', {
+                var response = await fetch('/api/auth/register', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ username, password }),
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: username, password: password }),
                 });
-                
-                const data = await response.json();
-                
+                var data = await response.json();
                 if (response.ok) {
                     showSuccess('注册成功，即将跳转到登录页面');
-                    setTimeout(() => {
-                        window.location.href = '/login';
-                    }, 2000);
+                    setTimeout(function() { window.location.href = '/login'; }, 2000);
                 } else {
                     showError(data.error || '注册失败');
                 }
@@ -199,24 +177,21 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    
-    // 使用 Resumable.js 实现断续上传
-    const fileInput = document.getElementById('file-input');
+
+    // ========== 文件上传（Resumable.js） ==========
+    var fileInput = document.getElementById('file-input');
     if (fileInput) {
         var r = new Resumable({
             target: '/api/files/upload',
             testTarget: '/api/files/upload',
             testChunks: true,
-            chunkSize: 1 * 1024 * 1024, // 1MB
+            chunkSize: 1 * 1024 * 1024,
             simultaneousUploads: 3,
             headers: getAuthHeader(),
             query: function(file, chunk) {
-                // 附加 parent_id 到每个请求
                 var parentInput = document.querySelector('input[name="parent_id"]');
                 var params = {};
-                if (parentInput && parentInput.value) {
-                    params.parent_id = parentInput.value;
-                }
+                if (parentInput && parentInput.value) params.parent_id = parentInput.value;
                 return params;
             }
         });
@@ -230,8 +205,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         r.on('fileProgress', function(file) {
-            var percent = file.progress(false) * 100;
-            updateProgressBall(percent);
+            updateProgressBall(file.progress(false) * 100);
         });
 
         r.on('fileSuccess', function(file) {
@@ -259,37 +233,28 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(function() { window.location.reload(); }, 2000);
         });
     }
-    
-    // 创建文件夹处理
-    const createFolderForm = document.getElementById('create-folder-form');
+
+    // ========== 创建文件夹 ==========
+    var createFolderForm = document.getElementById('create-folder-form');
     if (createFolderForm) {
         createFolderForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
-            const name = document.getElementById('folder-name').value;
-            const parentInput = document.querySelector('#create-folder-form input[name="parent_id"]');
-            
-            const body = { name: name };
-            if (parentInput && parentInput.value) {
-                body.parent_id = parseInt(parentInput.value);
-            }
-            
+            var name = document.getElementById('folder-name').value;
+            var parentInput = document.querySelector('#create-folder-form input[name="parent_id"]');
+            var body = { name: name };
+            if (parentInput && parentInput.value) body.parent_id = parseInt(parentInput.value);
+
             try {
-                const response = await fetch('/api/folders', {
+                var response = await authFetch('/api/folders', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...getAuthHeader(),
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body),
                 });
-                
-                const data = await response.json();
-                
+                var data = await response.json();
                 if (response.ok) {
                     showMessage('文件夹创建成功');
                     hideCreateFolderModal();
-                    setTimeout(() => window.location.reload(), 1000);
+                    setTimeout(function() { window.location.reload(); }, 1000);
                 } else {
                     showMessage(data.error || '创建失败', true);
                 }
@@ -298,157 +263,26 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-});
 
-// 显示创建文件夹模态框
-function showCreateFolderModal() {
-    const modal = document.getElementById('create-folder-modal');
-    if (modal) {
-        modal.classList.remove('hidden');
-    }
-}
-
-// 隐藏创建文件夹模态框
-function hideCreateFolderModal() {
-    const modal = document.getElementById('create-folder-modal');
-    const input = document.getElementById('folder-name');
-    if (modal) {
-        modal.classList.add('hidden');
-    }
-    if (input) {
-        input.value = '';
-    }
-}
-
-// 删除文件/文件夹
-async function deleteItem(id, isFolder) {
-    if (!confirm('确定要删除吗？')) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/api/files/${id}`, {
-            method: 'DELETE',
-            headers: getAuthHeader(),
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-            showMessage('删除成功');
-            setTimeout(() => window.location.reload(), 1000);
-        } else {
-            showMessage(data.error || '删除失败', true);
-        }
-    } catch (err) {
-        showMessage('网络错误，请重试', true);
-    }
-}
-
-// 下载文件
-function downloadFile(id) {
-    window.location.href = `/api/files/${id}/download`;
-}
-
-// 下载文件夹（ZIP 格式）
-function downloadFolder(id) {
-    if (!confirm('下载文件夹可能需要压缩过程，这会消耗一段时间，请您坐和放宽，下载马上开始。确认下载吗？')) {
-        return;
-    }
-    window.location.href = `/api/folders/${id}/download`;
-}
-
-// 退出登录
-function logout() {
-    clearToken();
-    window.location.href = '/login';
-}
-
-// 切换下拉菜单
-function toggleDropdown(id) {
-    // 关闭其他下拉菜单
-    document.querySelectorAll('[id^="dropdown-"]').forEach(el => {
-        if (el.id !== id) {
-            el.classList.add('hidden');
-        }
-    });
-    
-    const dropdown = document.getElementById(id);
-    if (dropdown) {
-        dropdown.classList.toggle('hidden');
-    }
-}
-
-// 点击页面其他地方关闭下拉菜单
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('[onclick^="toggleDropdown"]') && !e.target.closest('[id^="dropdown-"]')) {
-        document.querySelectorAll('[id^="dropdown-"]').forEach(el => {
-            el.classList.add('hidden');
-        });
-    }
-});
-
-// 显示重命名模态框
-function showRenameModal(id, currentName) {
-    const modal = document.getElementById('rename-modal');
-    const idInput = document.getElementById('rename-item-id');
-    const nameInput = document.getElementById('rename-item-name');
-    
-    if (modal && idInput && nameInput) {
-        idInput.value = id;
-        nameInput.value = currentName;
-        modal.classList.remove('hidden');
-        nameInput.focus();
-        nameInput.select();
-    }
-    
-    // 关闭下拉菜单
-    document.querySelectorAll('[id^="dropdown-"]').forEach(el => {
-        el.classList.add('hidden');
-    });
-}
-
-// 从链接元素显示重命名模态框（处理特殊字符）
-function showRenameModalFromLink(element) {
-    const id = element.getAttribute('data-id');
-    const name = element.getAttribute('data-name');
-    showRenameModal(id, name);
-}
-
-// 隐藏重命名模态框
-function hideRenameModal() {
-    const modal = document.getElementById('rename-modal');
-    if (modal) {
-        modal.classList.add('hidden');
-    }
-}
-
-// 重命名表单提交处理
-document.addEventListener('DOMContentLoaded', function() {
-    const renameForm = document.getElementById('rename-form');
+    // ========== 重命名 ==========
+    var renameForm = document.getElementById('rename-form');
     if (renameForm) {
         renameForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
-            const id = document.getElementById('rename-item-id').value;
-            const newName = document.getElementById('rename-item-name').value;
-            
+            var id = document.getElementById('rename-item-id').value;
+            var newName = document.getElementById('rename-item-name').value;
+
             try {
-                const response = await fetch(`/api/files/${id}/rename`, {
+                var response = await authFetch('/api/files/' + id + '/rename', {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...getAuthHeader(),
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: newName }),
                 });
-                
-                const data = await response.json();
-                
+                var data = await response.json();
                 if (response.ok) {
                     showMessage('重命名成功');
                     hideRenameModal();
-                    setTimeout(() => window.location.reload(), 1000);
+                    setTimeout(function() { window.location.reload(); }, 1000);
                 } else {
                     showMessage(data.error || '重命名失败', true);
                 }
@@ -457,114 +291,28 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-});
 
-// 显示移动模态框
-async function showMoveModal(element) {
-    const id = element.getAttribute('data-id');
-    const modal = document.getElementById('move-modal');
-    const idInput = document.getElementById('move-item-id');
-    const select = document.getElementById('move-target-id');
-
-    if (modal && idInput && select) {
-        idInput.value = id;
-
-        // 关闭下拉菜单
-        document.querySelectorAll('[id^="dropdown-"]').forEach(el => {
-            el.classList.add('hidden');
-        });
-
-        // 清空并加载文件夹列表
-        select.innerHTML = '<option value="">根目录</option>';
-
-        try {
-            const response = await fetch('/api/folders/all', {
-                headers: getAuthHeader(),
-            });
-            const data = await response.json();
-
-            if (response.ok && data.folders) {
-                // 构建 id -> folder 映射
-                const folderMap = {};
-                data.folders.forEach(function(f) {
-                    folderMap[f.ID] = f;
-                });
-
-                // 为每个文件夹构建完整路径
-                data.folders.forEach(function(f) {
-                    // 排除自身（不能移动到自己里面）
-                    if (String(f.ID) === String(id)) return;
-
-                    var path = buildFolderPath(f, folderMap);
-                    var option = document.createElement('option');
-                    option.value = f.ID;
-                    option.textContent = path;
-                    select.appendChild(option);
-                });
-            }
-        } catch (err) {
-            // 加载失败不影响使用，用户至少可以选根目录
-        }
-
-        modal.classList.remove('hidden');
-    }
-}
-
-// 构建文件夹的完整路径
-function buildFolderPath(folder, folderMap) {
-    var parts = [folder.Name];
-    var current = folder;
-    var visited = {};
-
-    while (current.ParentID && folderMap[current.ParentID]) {
-        if (visited[current.ID]) break;
-        visited[current.ID] = true;
-
-        current = folderMap[current.ParentID];
-        parts.unshift(current.Name);
-    }
-
-    return '根目录 / ' + parts.join(' / ');
-}
-
-// 隐藏移动模态框
-function hideMoveModal() {
-    const modal = document.getElementById('move-modal');
-    if (modal) {
-        modal.classList.add('hidden');
-    }
-}
-
-// 移动表单提交处理
-document.addEventListener('DOMContentLoaded', function() {
-    const moveForm = document.getElementById('move-form');
+    // ========== 移动 ==========
+    var moveForm = document.getElementById('move-form');
     if (moveForm) {
         moveForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-
-            const id = document.getElementById('move-item-id').value;
-            const targetValue = document.getElementById('move-target-id').value;
-            const body = {};
-            if (targetValue) {
-                body.target_id = parseInt(targetValue);
-            }
+            var id = document.getElementById('move-item-id').value;
+            var targetValue = document.getElementById('move-target-id').value;
+            var body = {};
+            if (targetValue) body.target_id = parseInt(targetValue);
 
             try {
-                const response = await fetch(`/api/files/${id}/move`, {
+                var response = await authFetch('/api/files/' + id + '/move', {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...getAuthHeader(),
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body),
                 });
-
-                const data = await response.json();
-
+                var data = await response.json();
                 if (response.ok) {
                     showMessage('移动成功');
                     hideMoveModal();
-                    setTimeout(() => window.location.reload(), 1000);
+                    setTimeout(function() { window.location.reload(); }, 1000);
                 } else {
                     showMessage(data.error || '移动失败', true);
                 }
@@ -572,5 +320,165 @@ document.addEventListener('DOMContentLoaded', function() {
                 showMessage('网络错误，请重试', true);
             }
         });
+    }
+});
+
+// ========== 模态框操作 ==========
+
+function showCreateFolderModal() {
+    var modal = document.getElementById('create-folder-modal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function hideCreateFolderModal() {
+    var modal = document.getElementById('create-folder-modal');
+    var input = document.getElementById('folder-name');
+    if (modal) modal.classList.add('hidden');
+    if (input) input.value = '';
+}
+
+function showRenameModal(id, currentName) {
+    var modal = document.getElementById('rename-modal');
+    var idInput = document.getElementById('rename-item-id');
+    var nameInput = document.getElementById('rename-item-name');
+    if (modal && idInput && nameInput) {
+        idInput.value = id;
+        nameInput.value = currentName;
+        modal.classList.remove('hidden');
+        nameInput.focus();
+        nameInput.select();
+    }
+    document.querySelectorAll('[id^="dropdown-"]').forEach(function(el) { el.classList.add('hidden'); });
+}
+
+function showRenameModalFromLink(element) {
+    showRenameModal(element.getAttribute('data-id'), element.getAttribute('data-name'));
+}
+
+function hideRenameModal() {
+    var modal = document.getElementById('rename-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function showMoveModal(element) {
+    var id = element.getAttribute('data-id');
+    var modal = document.getElementById('move-modal');
+    var idInput = document.getElementById('move-item-id');
+    var select = document.getElementById('move-target-id');
+
+    if (modal && idInput && select) {
+        idInput.value = id;
+        document.querySelectorAll('[id^="dropdown-"]').forEach(function(el) { el.classList.add('hidden'); });
+        select.innerHTML = '<option value="">根目录</option>';
+
+        authFetch('/api/folders/all').then(function(response) { return response.json(); }).then(function(data) {
+            if (data.folders) {
+                var folderMap = {};
+                data.folders.forEach(function(f) { folderMap[f.ID] = f; });
+                data.folders.forEach(function(f) {
+                    if (String(f.ID) === String(id)) return;
+                    var path = buildFolderPath(f, folderMap);
+                    var option = document.createElement('option');
+                    option.value = f.ID;
+                    option.textContent = path;
+                    select.appendChild(option);
+                });
+            }
+        }).catch(function() {});
+
+        modal.classList.remove('hidden');
+    }
+}
+
+function hideMoveModal() {
+    var modal = document.getElementById('move-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function buildFolderPath(folder, folderMap) {
+    var parts = [folder.Name];
+    var current = folder;
+    var visited = {};
+    while (current.ParentID && folderMap[current.ParentID]) {
+        if (visited[current.ID]) break;
+        visited[current.ID] = true;
+        current = folderMap[current.ParentID];
+        parts.unshift(current.Name);
+    }
+    return '根目录 / ' + parts.join(' / ');
+}
+
+// ========== 删除 ==========
+
+async function deleteItem(id, isFolder) {
+    if (!confirm('确定要删除吗？')) return;
+
+    try {
+        var response = await authFetch('/api/files/' + id, { method: 'DELETE' });
+        var data = await response.json();
+        if (response.ok) {
+            showMessage('删除成功');
+            setTimeout(function() { window.location.reload(); }, 1000);
+        } else {
+            showMessage(data.error || '删除失败', true);
+        }
+    } catch (err) {
+        showMessage('网络错误，请重试', true);
+    }
+}
+
+// ========== 下载（通过短链接） ==========
+
+async function downloadFile(id) {
+    try {
+        var response = await authFetch('/api/files/' + id + '/download-link', { method: 'POST' });
+        var data = await response.json();
+        if (response.ok) {
+            window.location.href = data.url;
+        } else {
+            showMessage(data.error || '获取下载链接失败', true);
+        }
+    } catch (err) {
+        showMessage('网络错误，请重试', true);
+    }
+}
+
+async function downloadFolder(id) {
+    if (!confirm('下载文件夹可能需要压缩过程，这会消耗一段时间，请您坐和放宽，下载马上开始。确认下载吗？')) return;
+
+    try {
+        var response = await authFetch('/api/folders/' + id + '/download-link', { method: 'POST' });
+        var data = await response.json();
+        if (response.ok) {
+            window.location.href = data.url;
+        } else {
+            showMessage(data.error || '获取下载链接失败', true);
+        }
+    } catch (err) {
+        showMessage('网络错误，请重试', true);
+    }
+}
+
+// ========== 退出登录 ==========
+
+function logout() {
+    fetch('/api/auth/logout', { method: 'POST' }).finally(function() {
+        window.location.href = '/login';
+    });
+}
+
+// ========== 下拉菜单 ==========
+
+function toggleDropdown(id) {
+    document.querySelectorAll('[id^="dropdown-"]').forEach(function(el) {
+        if (el.id !== id) el.classList.add('hidden');
+    });
+    var dropdown = document.getElementById(id);
+    if (dropdown) dropdown.classList.toggle('hidden');
+}
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('[onclick^="toggleDropdown"]') && !e.target.closest('[id^="dropdown-"]')) {
+        document.querySelectorAll('[id^="dropdown-"]').forEach(function(el) { el.classList.add('hidden'); });
     }
 });

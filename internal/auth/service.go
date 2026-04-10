@@ -1,6 +1,9 @@
 package auth
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"regexp"
 	"strings"
@@ -10,6 +13,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
+)
+
+const (
+	AccessTokenExpiry  = 15 * time.Minute
+	RefreshTokenExpiry = 7 * 24 * time.Hour
 )
 
 type Service struct {
@@ -26,53 +34,39 @@ func NewService(db *gorm.DB, jwtSecret string) *Service {
 
 // 注册
 func (s *Service) Register(req *RegisterRequest) (*User, error) {
-	// 验证用户名
 	if err := validateUsername(req.Username); err != nil {
 		return nil, err
 	}
-
-	// 验证密码强度
 	if err := validatePassword(req.Password); err != nil {
 		return nil, err
 	}
 
-	// 检查用户名是否存在
 	var existing User
 	if err := s.db.Where("username = ?", req.Username).First(&existing).Error; err == nil {
 		return nil, errors.New("username already exists")
 	}
 
-	// 密码加密
 	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
 
-	user := &User{
-		Username: req.Username,
-		Password: string(hashed),
-	}
+	user := &User{Username: req.Username, Password: string(hashed)}
 	if err := s.db.Create(user).Error; err != nil {
 		return nil, err
 	}
-
 	return user, nil
 }
 
-// validateUsername 验证用户名
 func validateUsername(username string) error {
 	username = strings.TrimSpace(username)
-
-	// 检查是否只包含字母、数字和下划线
 	matched, _ := regexp.MatchString("^[a-zA-Z0-9_]+$", username)
 	if !matched {
 		return errors.New("用户名只能包含字母、数字和下划线")
 	}
-
 	return nil
 }
 
-// validatePassword 验证密码强度
 func validatePassword(password string) error {
 	var hasUpper, hasLower, hasDigit bool
 	for _, r := range password {
@@ -86,23 +80,26 @@ func validatePassword(password string) error {
 			hasDigit = true
 		}
 	}
-
-	// 检查是否包含大写字母
 	if !hasUpper {
 		return errors.New("密码必须包含至少一个大写字母")
 	}
-
-	// 检查是否包含小写字母
 	if !hasLower {
 		return errors.New("密码必须包含至少一个小写字母")
 	}
-
-	// 检查是否包含数字
 	if !hasDigit {
 		return errors.New("密码必须包含至少一个数字")
 	}
-
 	return nil
+}
+
+// GenerateAccessToken 生成短期 Access Token (JWT)
+func (s *Service) GenerateAccessToken(userID uint, username string) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id":  userID,
+		"username": username,
+		"exp":      time.Now().Add(AccessTokenExpiry).Unix(),
+	})
+	return token.SignedString([]byte(s.jwtSecret))
 }
 
 // Claims JWT claims 结构
@@ -120,15 +117,66 @@ func ParseToken(tokenString, jwtSecret string) (*Claims, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
 		return claims, nil
 	}
-
 	return nil, errors.New("invalid token")
 }
 
-// 登录
+// generateRandomToken 生成安全的随机 token
+func generateRandomToken() (string, string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", "", err
+	}
+	raw := hex.EncodeToString(b)
+	hash := sha256.Sum256([]byte(raw))
+	return raw, hex.EncodeToString(hash[:]), nil
+}
+
+// GenerateRefreshToken 生成并存储 Refresh Token
+func (s *Service) GenerateRefreshToken(userID uint) (string, error) {
+	raw, hashed, err := generateRandomToken()
+	if err != nil {
+		return "", err
+	}
+
+	rt := &RefreshToken{
+		UserID:    userID,
+		Token:     hashed,
+		ExpiresAt: time.Now().Add(RefreshTokenExpiry),
+	}
+	if err := s.db.Create(rt).Error; err != nil {
+		return "", err
+	}
+	return raw, nil
+}
+
+// ValidateRefreshToken 验证 refresh token，返回 userID
+func (s *Service) ValidateRefreshToken(rawToken string) (uint, error) {
+	hash := sha256.Sum256([]byte(rawToken))
+	hashed := hex.EncodeToString(hash[:])
+
+	var rt RefreshToken
+	if err := s.db.Where("token = ? AND revoked = ? AND expires_at > ?", hashed, false, time.Now()).First(&rt).Error; err != nil {
+		return 0, errors.New("invalid or expired refresh token")
+	}
+	return rt.UserID, nil
+}
+
+// RevokeRefreshToken 吊销指定的 refresh token
+func (s *Service) RevokeRefreshToken(rawToken string) {
+	hash := sha256.Sum256([]byte(rawToken))
+	hashed := hex.EncodeToString(hash[:])
+	s.db.Model(&RefreshToken{}).Where("token = ?", hashed).Update("revoked", true)
+}
+
+// RevokeAllUserTokens 吊销用户的所有 refresh token
+func (s *Service) RevokeAllUserTokens(userID uint) {
+	s.db.Model(&RefreshToken{}).Where("user_id = ?", userID).Update("revoked", true)
+}
+
+// Login 登录：返回 access token + refresh token
 func (s *Service) Login(req *LoginRequest) (*LoginResponse, error) {
 	var user User
 	if err := s.db.Where("username = ?", req.Username).First(&user).Error; err != nil {
@@ -138,27 +186,40 @@ func (s *Service) Login(req *LoginRequest) (*LoginResponse, error) {
 		return nil, err
 	}
 
-	// 验证密码
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		return nil, errors.New("invalid username or password")
 	}
 
-	// 签发 JWT
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id":  user.ID,
-		"username": user.Username,
-		"exp":      time.Now().Add(24 * time.Hour).Unix(),
-	})
-	tokenString, err := token.SignedString([]byte(s.jwtSecret))
+	accessToken, err := s.GenerateAccessToken(user.ID, user.Username)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, err := s.GenerateRefreshToken(user.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &LoginResponse{
-		Token: tokenString,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
 		User: UserInfo{
 			ID:       user.ID,
 			Username: user.Username,
 		},
 	}, nil
+}
+
+// GetUserByID 根据 ID 获取用户
+func (s *Service) GetUserByID(id uint) (*User, error) {
+	var user User
+	if err := s.db.Where("id = ?", id).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+// CleanExpiredRefreshTokens 清理过期的 refresh token
+func (s *Service) CleanExpiredRefreshTokens() {
+	s.db.Where("expires_at < ? OR revoked = ?", time.Now(), true).Delete(&RefreshToken{})
 }
