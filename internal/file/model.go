@@ -8,16 +8,17 @@ import (
 )
 
 type File struct {
-	ID         uint   `gorm:"primaryKey"`
-	UserID     uint   `gorm:"index"`    // 所属用户
-	ParentID   *uint  `gorm:"index"`    // 父目录ID，nil表示根目录
-	Name       string `gorm:"size:255"` // 原始文件名
-	StorageKey string `gorm:"size:512"` // 存储层的key（路径或对象ID）
-	Size       int64  // 文件大小
-	IsDir      bool   // 是否为目录
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	DeletedAt  gorm.DeletedAt `gorm:"index"`
+	ID          uint   `gorm:"primaryKey"`
+	UserID      uint   `gorm:"index"`         // 所属用户
+	ParentID    *uint  `gorm:"index"`         // 父目录ID，nil表示根目录
+	Name        string `gorm:"size:255"`      // 原始文件名
+	StorageKey  string `gorm:"size:512"`      // 存储层的key（路径或对象ID）
+	ContentHash string `gorm:"size:64;index"` // 文件内容SHA-256哈希，用于去重
+	Size        int64  // 文件大小
+	IsDir       bool   // 是否为目录
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   gorm.DeletedAt `gorm:"index"`
 }
 
 // LastModified 返回HTTP格式的修改时间

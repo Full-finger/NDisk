@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"crypto/rand"
 	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -14,7 +15,6 @@ import (
 	"time"
 
 	"github.com/Full-finger/NDisk/internal/storage"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -37,7 +37,12 @@ func (s *Service) SetZipDir(dir string) {
 	os.MkdirAll(dir, 0755)
 }
 
-// 上传文件
+// contentStorageKey 根据内容哈希生成存储路径
+func contentStorageKey(contentHash string) string {
+	return fmt.Sprintf("content/%s/%s", contentHash[:2], contentHash)
+}
+
+// 上传文件（支持跨用户内容去重 + 同目录同名替换）
 func (s *Service) Upload(userID uint, parentID *uint, filename string, size int64, reader io.Reader) (*File, error) {
 	// 安全处理文件名：只取基本文件名，去除路径部分
 	safeFilename := filepath.Base(filename)
@@ -56,30 +61,85 @@ func (s *Service) Upload(userID uint, parentID *uint, filename string, size int6
 		return nil, fmt.Errorf("无效的文件名")
 	}
 
-	// 生成存储key：用户ID/时间戳_uuid/文件名
-	storageKey := fmt.Sprintf("%d/%d_%s/%s", userID, time.Now().Unix(), uuid.New().String()[:8], safeFilename)
+	// 边读边计算 SHA-256 哈希，同时写入临时文件
+	hasher := sha256.New()
+	tmpKey := fmt.Sprintf(".tmp/%d_%d", userID, time.Now().UnixNano())
+	tee := io.TeeReader(reader, hasher)
 
-	// 存储文件
-	if err := s.storage.Save(storageKey, reader); err != nil {
+	// 存储到临时路径
+	if err := s.storage.Save(tmpKey, tee); err != nil {
 		return nil, err
+	}
+
+	// 获取内容哈希
+	contentHash := hex.EncodeToString(hasher.Sum(nil))
+
+	// 检查同目录下是否存在同名文件，如果存在则替换
+	var existingFile File
+	sameNameQuery := s.db.Where("user_id = ? AND name = ? AND is_dir = ?", userID, safeFilename, false)
+	if parentID == nil {
+		sameNameQuery = sameNameQuery.Where("parent_id IS NULL")
+	} else {
+		sameNameQuery = sameNameQuery.Where("parent_id = ?", *parentID)
+	}
+
+	if err := sameNameQuery.First(&existingFile).Error; err == nil {
+		// 同名文件已存在，先删除旧记录（引用计数会处理物理文件）
+		s.Delete(userID, existingFile.ID)
+	}
+
+	// 基于内容哈希的最终存储路径
+	storageKey := contentStorageKey(contentHash)
+
+	// 检查物理文件是否已存在（跨用户去重）
+	if !s.storage.Exists(storageKey) {
+		// 物理文件不存在，将临时文件移动到最终位置
+		if err := s.moveStorage(tmpKey, storageKey); err != nil {
+			s.storage.Delete(tmpKey)
+			return nil, err
+		}
+	} else {
+		// 物理文件已存在（内容相同），直接删除临时文件
+		s.storage.Delete(tmpKey)
 	}
 
 	// 保存元数据
 	file := &File{
-		UserID:     userID,
-		ParentID:   parentID,
-		Name:       safeFilename,
-		StorageKey: storageKey,
-		Size:       size,
-		IsDir:      false,
+		UserID:      userID,
+		ParentID:    parentID,
+		Name:        safeFilename,
+		StorageKey:  storageKey,
+		ContentHash: contentHash,
+		Size:        size,
+		IsDir:       false,
 	}
 	if err := s.db.Create(file).Error; err != nil {
-		// 回滚：删除已存文件
-		s.storage.Delete(storageKey)
+		// 创建失败，检查是否需要清理物理文件
+		var refCount int64
+		s.db.Model(&File{}).Where("storage_key = ?", storageKey).Count(&refCount)
+		if refCount == 0 {
+			s.storage.Delete(storageKey)
+		}
 		return nil, err
 	}
 
 	return file, nil
+}
+
+// moveStorage 移动存储文件（通过复制+删除实现）
+func (s *Service) moveStorage(srcKey, dstKey string) error {
+	reader, err := s.storage.Open(srcKey)
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+
+	if err := s.storage.Save(dstKey, reader); err != nil {
+		return err
+	}
+
+	s.storage.Delete(srcKey)
+	return nil
 }
 
 // 创建文件夹
@@ -212,22 +272,32 @@ func (s *Service) GetBreadcrumb(userID uint, folderID *uint) ([]BreadcrumbItem, 
 	return path, nil
 }
 
-// 删除文件
+// 删除文件（引用计数：只有当没有其他记录引用同一物理文件时才删除）
 func (s *Service) Delete(userID uint, fileID uint) error {
 	var file File
 	if err := s.db.Where("id = ? AND user_id = ?", fileID, userID).First(&file).Error; err != nil {
 		return err
 	}
 
-	// 删除物理文件（如果不是目录）
-	if !file.IsDir {
-		s.storage.Delete(file.StorageKey)
-	}
-
 	// 使相关 ZIP 缓存失效
 	s.invalidateCacheForItem(userID, &file)
 
-	return s.db.Delete(&file).Error
+	// 先删除数据库记录
+	if err := s.db.Delete(&file).Error; err != nil {
+		return err
+	}
+
+	// 删除物理文件（如果不是目录）
+	// 只有当没有其他文件记录引用同一个存储路径时才真正删除
+	if !file.IsDir && file.StorageKey != "" {
+		var refCount int64
+		s.db.Model(&File{}).Where("storage_key = ?", file.StorageKey).Count(&refCount)
+		if refCount == 0 {
+			s.storage.Delete(file.StorageKey)
+		}
+	}
+
+	return nil
 }
 
 // 重命名文件或文件夹
@@ -325,7 +395,7 @@ func (s *Service) UploadFromChunks(userID uint, parentID *uint, filename string,
 	// 合并所有分块为一个 reader
 	combined := io.MultiReader(readers...)
 
-	// 调用已有的 Upload 方法完成最终存储和数据库记录
+	// 调用已有的 Upload 方法完成最终存储和数据库记录（含去重逻辑）
 	result, err := s.Upload(userID, parentID, filename, totalSize, combined)
 
 	// 关闭所有分块 reader
@@ -820,3 +890,4 @@ func (s *Service) ValidateDownloadLink(token string) *DownloadLink {
 func (s *Service) CleanExpiredDownloadLinks() {
 	s.db.Where("expires_at < ?", time.Now()).Delete(&DownloadLink{})
 }
+
