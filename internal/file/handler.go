@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -278,7 +280,40 @@ func (h *Handler) DownloadByToken(c *gin.Context) {
 	}
 }
 
-// downloadFileByLink 通过短链接下载文件
+// detectContentType 根据文件扩展名推断 MIME 类型
+func detectContentType(filename string) string {
+	ext := strings.ToLower(filepath.Ext(filename))
+	// 优先使用 mime 库
+	if ct := mime.TypeByExtension(ext); ct != "" {
+		return ct
+	}
+	// 补充常见类型
+	switch ext {
+	case ".json":
+		return "application/json"
+	case ".xml":
+		return "application/xml"
+	case ".js":
+		return "text/javascript; charset=utf-8"
+	case ".css":
+		return "text/css; charset=utf-8"
+	case ".html", ".htm":
+		return "text/html; charset=utf-8"
+	case ".md", ".markdown":
+		return "text/markdown; charset=utf-8"
+	case ".svg":
+		return "image/svg+xml"
+	case ".go", ".py", ".java", ".c", ".cpp", ".h", ".hpp", ".rs", ".rb", ".php",
+		".sh", ".bash", ".zsh", ".ts", ".tsx", ".jsx", ".vue", ".yaml", ".yml",
+		".toml", ".ini", ".cfg", ".conf", ".log", ".sql", ".txt",
+		".swift", ".kt", ".scala", ".dart", ".lua", ".pl", ".r":
+		return "text/plain; charset=utf-8"
+	default:
+		return "application/octet-stream"
+	}
+}
+
+// downloadFileByLink 通过短链接下载文件（支持 inline 预览模式）
 func (h *Handler) downloadFileByLink(c *gin.Context, link *DownloadLink) {
 	file, err := h.service.GetFile(link.UserID, link.FileID)
 	if err != nil {
@@ -286,19 +321,28 @@ func (h *Handler) downloadFileByLink(c *gin.Context, link *DownloadLink) {
 		return
 	}
 
+	// 检测是否为 inline 预览模式
+	isInline := c.Query("inline") == "1"
+
 	c.Header("Accept-Ranges", "bytes")
 	c.Header("ETag", file.ETag())
 	c.Header("Last-Modified", file.LastModified())
-	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(file.Name))
+
+	if isInline {
+		c.Header("Content-Type", detectContentType(file.Name))
+		c.Header("Content-Disposition", "inline; filename="+url.QueryEscape(file.Name))
+	} else {
+		c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(file.Name))
+	}
 
 	rangeHeader := c.GetHeader("Range")
 	if rangeHeader == "" {
-		h.serveFullFile(c, file)
+		h.serveFullFile(c, file, isInline)
 		return
 	}
 
 	if !h.checkIfRange(c, file) {
-		h.serveFullFile(c, file)
+		h.serveFullFile(c, file, isInline)
 		return
 	}
 
@@ -310,9 +354,9 @@ func (h *Handler) downloadFileByLink(c *gin.Context, link *DownloadLink) {
 	}
 
 	if len(ranges) == 1 {
-		h.serveSingleRange(c, file, ranges[0])
+		h.serveSingleRange(c, file, ranges[0], isInline)
 	} else {
-		h.serveMultipleRanges(c, file, ranges)
+		h.serveMultipleRanges(c, file, ranges, isInline)
 	}
 }
 
@@ -363,7 +407,7 @@ func (h *Handler) downloadFolderByLink(c *gin.Context, link *DownloadLink) {
 }
 
 // serveFullFile 返回完整文件
-func (h *Handler) serveFullFile(c *gin.Context, file *File) {
+func (h *Handler) serveFullFile(c *gin.Context, file *File, isInline bool) {
 	_, reader, err := h.service.Download(file.UserID, file.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot read file"})
@@ -371,13 +415,17 @@ func (h *Handler) serveFullFile(c *gin.Context, file *File) {
 	}
 	defer reader.Close()
 
-	c.Header("Content-Type", "application/octet-stream")
+	if isInline {
+		c.Header("Content-Type", detectContentType(file.Name))
+	} else {
+		c.Header("Content-Type", "application/octet-stream")
+	}
 	c.Header("Content-Length", strconv.FormatInt(file.Size, 10))
 	c.Status(http.StatusOK)
 	io.Copy(c.Writer, reader)
 }
 
-func (h *Handler) serveSingleRange(c *gin.Context, file *File, r httpRange) {
+func (h *Handler) serveSingleRange(c *gin.Context, file *File, r httpRange, isInline bool) {
 	_, reader, err := h.service.DownloadRange(file.UserID, file.ID, r.start, r.length)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot read file"})
@@ -385,21 +433,30 @@ func (h *Handler) serveSingleRange(c *gin.Context, file *File, r httpRange) {
 	}
 	defer reader.Close()
 
-	c.Header("Content-Type", "application/octet-stream")
+	if isInline {
+		c.Header("Content-Type", detectContentType(file.Name))
+	} else {
+		c.Header("Content-Type", "application/octet-stream")
+	}
 	c.Header("Content-Length", strconv.FormatInt(r.length, 10))
 	c.Header("Content-Range", fmt.Sprintf("bytes %d-%d/%d", r.start, r.start+r.length-1, file.Size))
 	c.Status(http.StatusPartialContent)
 	io.Copy(c.Writer, reader)
 }
 
-func (h *Handler) serveMultipleRanges(c *gin.Context, file *File, ranges []httpRange) {
+func (h *Handler) serveMultipleRanges(c *gin.Context, file *File, ranges []httpRange, isInline bool) {
 	boundary := fmt.Sprintf("BOUNDARY-%d", file.ID)
 	c.Header("Content-Type", "multipart/byteranges; boundary="+boundary)
 	c.Status(http.StatusPartialContent)
 
+	contentType := "application/octet-stream"
+	if isInline {
+		contentType = detectContentType(file.Name)
+	}
+
 	for _, r := range ranges {
 		c.Writer.WriteString(fmt.Sprintf("\r\n--%s\r\n", boundary))
-		c.Writer.WriteString("Content-Type: application/octet-stream\r\n")
+		c.Writer.WriteString("Content-Type: " + contentType + "\r\n")
 		c.Writer.WriteString(fmt.Sprintf("Content-Range: bytes %d-%d/%d\r\n\r\n", r.start, r.start+r.length-1, file.Size))
 
 		_, reader, err := h.service.DownloadRange(file.UserID, file.ID, r.start, r.length)

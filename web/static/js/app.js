@@ -612,3 +612,187 @@ document.addEventListener('click', function(e) {
         document.querySelectorAll('[id^="dropdown-"]').forEach(function(el) { el.classList.add('hidden'); });
     }
 });
+
+// ========== 文件预览 ==========
+
+var PREVIEW_MAX_SIZE = 50 * 1024 * 1024; // 50MB
+
+var PREVIEWABLE_EXTS = {
+    image: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff', 'tif'],
+    video: ['mp4', 'webm', 'ogg', 'ogv'],
+    audio: ['mp3', 'wav', 'ogg', 'oga', 'm4a', 'flac', 'aac'],
+    pdf: ['pdf'],
+    text: [
+        'txt', 'log', 'md', 'markdown', 'go', 'py', 'java', 'c', 'cpp', 'h', 'hpp',
+        'rs', 'rb', 'php', 'sh', 'bash', 'zsh', 'js', 'ts', 'tsx', 'jsx', 'vue',
+        'css', 'scss', 'less', 'html', 'htm', 'xml', 'json', 'yaml', 'yml',
+        'toml', 'ini', 'cfg', 'conf', 'sql', 'swift', 'kt', 'scala', 'dart',
+        'lua', 'pl', 'r', 'makefile', 'dockerfile', 'gitignore', 'env',
+        'csv', 'bat', 'ps1', 'gradle', 'cmake', 'properties'
+    ],
+    markdown: ['md', 'markdown']
+};
+
+function getFileCategory(name) {
+    var ext = name.split('.').pop().toLowerCase();
+    for (var cat in PREVIEWABLE_EXTS) {
+        if (PREVIEWABLE_EXTS[cat].indexOf(ext) !== -1) {
+            return cat;
+        }
+    }
+    return null;
+}
+
+function previewFile(element) {
+    var id = element.getAttribute('data-id');
+    var name = element.getAttribute('data-name');
+    var size = parseInt(element.getAttribute('data-size'), 10);
+
+    // 关闭下拉菜单
+    document.querySelectorAll('[id^="dropdown-"]').forEach(function(el) { el.classList.add('hidden'); });
+
+    var category = getFileCategory(name);
+    if (!category) {
+        showMessage('该文件格式不支持在线预览', true);
+        return;
+    }
+
+    if (size > PREVIEW_MAX_SIZE) {
+        showMessage('文件过大（超过 50MB），请下载查看', true);
+        return;
+    }
+
+    // 创建下载链接用于预览
+    authFetch('/api/files/' + id + '/download-link', { method: 'POST' })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.url) {
+                var previewUrl = data.url + '?inline=1';
+                showPreviewModal(name, previewUrl, category);
+            } else {
+                showMessage(data.error || '获取预览链接失败', true);
+            }
+        })
+        .catch(function() {
+            showMessage('网络错误，请重试', true);
+        });
+}
+
+function showPreviewModal(name, url, category) {
+    var modal = document.getElementById('preview-modal');
+    var title = document.getElementById('preview-title');
+    var content = document.getElementById('preview-content');
+
+    title.textContent = name;
+    content.innerHTML = '';
+
+    if (category === 'image') {
+        var img = document.createElement('img');
+        img.src = url;
+        img.alt = name;
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '100%';
+        img.style.objectFit = 'contain';
+        content.appendChild(img);
+    } else if (category === 'video') {
+        var video = document.createElement('video');
+        video.src = url;
+        video.controls = true;
+        video.style.maxWidth = '100%';
+        video.style.maxHeight = '100%';
+        content.appendChild(video);
+    } else if (category === 'audio') {
+        var audioContainer = document.createElement('div');
+        audioContainer.className = 'text-center';
+        var audioIcon = document.createElement('div');
+        audioIcon.innerHTML = '<svg class="mx-auto mb-4" style="width:80px;height:80px;color:#6b7280" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>';
+        audioContainer.appendChild(audioIcon);
+        var audio = document.createElement('audio');
+        audio.src = url;
+        audio.controls = true;
+        audioContainer.appendChild(audio);
+        content.appendChild(audioContainer);
+    } else if (category === 'pdf') {
+        var iframe = document.createElement('iframe');
+        iframe.src = url;
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.border = 'none';
+        content.appendChild(iframe);
+    } else if (category === 'markdown') {
+        content.style.justifyContent = 'flex-start';
+        content.style.alignItems = 'flex-start';
+        fetch(url).then(function(r) { return r.text(); }).then(function(text) {
+            var div = document.createElement('div');
+            div.className = 'prose max-w-none w-full';
+            div.innerHTML = marked.parse(text);
+            content.appendChild(div);
+        }).catch(function() {
+            content.innerHTML = '<p class="text-red-500">加载文件内容失败</p>';
+        });
+    } else if (category === 'text') {
+        content.style.justifyContent = 'flex-start';
+        content.style.alignItems = 'flex-start';
+        fetch(url).then(function(r) { return r.text(); }).then(function(text) {
+            var ext = name.split('.').pop().toLowerCase();
+            // highlight.js 语言映射
+            var langMap = {
+                'go': 'go', 'py': 'python', 'java': 'java', 'c': 'c', 'cpp': 'cpp',
+                'h': 'c', 'hpp': 'cpp', 'rs': 'rust', 'rb': 'ruby', 'php': 'php',
+                'sh': 'bash', 'bash': 'bash', 'zsh': 'bash', 'js': 'javascript',
+                'ts': 'typescript', 'tsx': 'typescript', 'jsx': 'javascript',
+                'vue': 'html', 'css': 'css', 'scss': 'scss', 'less': 'less',
+                'html': 'html', 'htm': 'html', 'xml': 'xml', 'json': 'json',
+                'yaml': 'yaml', 'yml': 'yaml', 'toml': 'ini', 'ini': 'ini',
+                'sql': 'sql', 'swift': 'swift', 'kt': 'kotlin', 'scala': 'scala',
+                'dart': 'dart', 'lua': 'lua', 'pl': 'perl', 'r': 'r',
+                'md': 'markdown', 'csv': 'plaintext', 'log': 'plaintext',
+                'txt': 'plaintext', 'conf': 'nginx', 'cfg': 'ini'
+            };
+            var lang = langMap[ext] || 'plaintext';
+            var pre = document.createElement('pre');
+            pre.style.width = '100%';
+            pre.style.margin = '0';
+            var code = document.createElement('code');
+            code.className = 'language-' + lang;
+            code.textContent = text;
+            pre.appendChild(code);
+            hljs.highlightElement(code);
+            content.appendChild(pre);
+        }).catch(function() {
+            content.innerHTML = '<p class="text-red-500">加载文件内容失败</p>';
+        });
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function hidePreviewModal() {
+    var modal = document.getElementById('preview-modal');
+    var content = document.getElementById('preview-content');
+    if (modal) modal.classList.add('hidden');
+    // 清理资源：停止视频/音频播放
+    if (content) {
+        var media = content.querySelector('video, audio');
+        if (media) media.pause();
+        content.innerHTML = '';
+        content.style.justifyContent = '';
+        content.style.alignItems = '';
+    }
+}
+
+function closePreview(event) {
+    if (event.target === document.getElementById('preview-modal')) {
+        hidePreviewModal();
+    }
+}
+
+// ESC 关闭预览
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        var modal = document.getElementById('preview-modal');
+        if (modal && !modal.classList.contains('hidden')) {
+            hidePreviewModal();
+        }
+    }
+});
