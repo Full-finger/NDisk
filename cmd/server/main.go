@@ -11,6 +11,7 @@ import (
 	"github.com/Full-finger/NDisk/internal/config"
 	"github.com/Full-finger/NDisk/internal/database"
 	"github.com/Full-finger/NDisk/internal/file"
+	"github.com/Full-finger/NDisk/internal/share"
 	"github.com/Full-finger/NDisk/internal/storage"
 	"github.com/Full-finger/NDisk/internal/web"
 	"github.com/gin-gonic/gin"
@@ -28,7 +29,7 @@ func main() {
 	}
 
 	// 自动迁移
-	db.AutoMigrate(&auth.User{}, &auth.RefreshToken{}, &file.File{}, &file.DownloadLink{})
+	db.AutoMigrate(&auth.User{}, &auth.RefreshToken{}, &file.File{}, &file.DownloadLink{}, &share.Share{})
 
 	store := storage.NewLocal(cfg.Storage.Path)
 
@@ -42,6 +43,9 @@ func main() {
 	fileHandler := file.NewHandler(fileService, cfg.JWTSecret)
 
 	webHandler := web.NewHandler(authService, fileService, cfg.JWTSecret)
+
+	shareService := share.NewService(db)
+	shareHandler := share.NewHandler(shareService, fileService)
 
 	r := gin.Default()
 
@@ -79,6 +83,13 @@ func main() {
 	// 下载短链接（无需认证）
 	r.GET("/api/dl/:token", fileHandler.DownloadByToken)
 
+	// 分享页面（公开）
+	r.GET("/s/:token", shareHandler.SharePage)
+
+	// 分享 API（公开）
+	r.POST("/api/shares/:token/verify", shareHandler.VerifyPassword)
+	r.GET("/api/shares/:token/download", shareHandler.Download)
+
 	// 受保护路由（需要 access token JWT）
 	api := r.Group("/api")
 	api.Use(auth.JWTMiddleware(cfg.JWTSecret))
@@ -102,6 +113,9 @@ func main() {
 		// 下载链接生成（需要认证）
 		api.POST("/files/:id/download-link", fileHandler.CreateDownloadLink)
 		api.POST("/folders/:id/download-link", fileHandler.CreateFolderDownloadLink)
+
+		// 分享（需要认证）
+		api.POST("/shares", shareHandler.CreateShare)
 	}
 
 	// 首页重定向
