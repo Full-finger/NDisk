@@ -181,13 +181,34 @@ document.addEventListener('DOMContentLoaded', function() {
     // ========== 文件上传（Resumable.js） ==========
     var fileInput = document.getElementById('file-input');
     if (fileInput) {
+        var _uploadRefreshTimer = null;
+        var _retrying401 = {};
+
+        function startUploadRefresh() {
+            if (_uploadRefreshTimer) return;
+            _uploadRefreshTimer = setInterval(function() {
+                fetch('/api/auth/refresh', { method: 'POST' }).then(function(res) {
+                    if (res.ok) {
+                        return res.json().then(function(data) { setAccessToken(data.access_token); });
+                    }
+                });
+            }, 4 * 60 * 1000);
+        }
+
+        function stopUploadRefresh() {
+            if (_uploadRefreshTimer) {
+                clearInterval(_uploadRefreshTimer);
+                _uploadRefreshTimer = null;
+            }
+        }
+
         var r = new Resumable({
             target: '/api/files/upload',
             testTarget: '/api/files/upload',
             testChunks: true,
             chunkSize: 1 * 1024 * 1024,
             simultaneousUploads: 3,
-            headers: getAuthHeader(),
+            headers: function() { return getAuthHeader(); },
             query: function(file, chunk) {
                 var parentInput = document.querySelector('input[name="parent_id"]');
                 var params = {};
@@ -201,6 +222,7 @@ document.addEventListener('DOMContentLoaded', function() {
         r.on('fileAdded', function(file) {
             showMessage('正在上传: ' + file.fileName);
             showProgressBall();
+            startUploadRefresh();
             r.upload();
         });
 
@@ -216,6 +238,28 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         r.on('fileError', function(file, message) {
+            var isAuthError = false;
+            try {
+                var errData = JSON.parse(message);
+                if (errData.error && (errData.error.indexOf('token') !== -1 || errData.error.indexOf('authorization') !== -1)) {
+                    isAuthError = true;
+                }
+            } catch(e) {}
+            if (!_retrying401[file.uniqueIdentifier] && isAuthError) {
+                _retrying401[file.uniqueIdentifier] = true;
+                fetch('/api/auth/refresh', { method: 'POST' }).then(function(res) {
+                    if (res.ok) {
+                        return res.json().then(function(data) {
+                            setAccessToken(data.access_token);
+                            file.retry();
+                        });
+                    }
+                    window.location.href = '/login';
+                }).catch(function() {
+                    window.location.href = '/login';
+                });
+                return;
+            }
             showMessage(file.fileName + ' 上传失败: ' + message, true);
             setProgressBallError();
             hideProgressBall(3000);
@@ -228,6 +272,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         r.on('complete', function() {
+            stopUploadRefresh();
             updateProgressBall(100);
             hideProgressBall(1500);
             setTimeout(function() { window.location.reload(); }, 2000);
