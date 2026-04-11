@@ -104,10 +104,8 @@ func main() {
 		api.POST("/folders/:id/download-link", fileHandler.CreateFolderDownloadLink)
 	}
 
-	// 首页重定向到登录页
-	r.GET("/", func(c *gin.Context) {
-		c.Redirect(http.StatusFound, "/login")
-	})
+	// 首页重定向
+	r.GET("/", webHandler.IndexRedirect)
 
 	log.Printf("Server starting on :%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {

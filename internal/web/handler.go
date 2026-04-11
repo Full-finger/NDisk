@@ -66,6 +66,18 @@ func (h *Handler) FilesPage(c *gin.Context) {
 	})
 }
 
+// IndexRedirect 首页重定向：有有效 refresh token 则跳转 /files，否则跳转 /login
+func (h *Handler) IndexRedirect(c *gin.Context) {
+	refreshToken, err := c.Cookie("refresh_token")
+	if err == nil && refreshToken != "" {
+		if _, err := h.authService.ValidateRefreshToken(refreshToken); err == nil {
+			c.Redirect(http.StatusFound, "/files")
+			return
+		}
+	}
+	c.Redirect(http.StatusFound, "/login")
+}
+
 // CookieAuthMiddleware 从 refresh token cookie 验证并生成 access token 注入页面
 func (h *Handler) CookieAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
