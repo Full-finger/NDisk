@@ -366,6 +366,45 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // ========== 分享 ==========
+    var shareForm = document.getElementById('share-form');
+    if (shareForm) {
+        shareForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            var itemId = document.getElementById('share-item-id').value;
+            var itemType = document.getElementById('share-item-type').value;
+            var projectName = document.getElementById('share-project-name').value;
+            var password = document.getElementById('share-password').value;
+            var expiresIn = document.getElementById('share-expires').value;
+
+            var body = {
+                item_id: parseInt(itemId),
+                is_folder: itemType === 'folder',
+                project_name: projectName,
+                expires_in: expiresIn
+            };
+            if (password) body.password = password;
+
+            try {
+                var response = await authFetch('/api/shares', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                var data = await response.json();
+                if (response.ok) {
+                    document.getElementById('share-form-view').classList.add('hidden');
+                    document.getElementById('share-success-view').classList.remove('hidden');
+                    document.getElementById('share-link').value = window.location.origin + '/s/' + data.share_token;
+                } else {
+                    showMessage(data.error || '创建分享失败', true);
+                }
+            } catch (err) {
+                showMessage('网络错误，请重试', true);
+            }
+        });
+    }
 });
 
 // ========== 模态框操作 ==========
@@ -438,6 +477,52 @@ function showMoveModal(element) {
 function hideMoveModal() {
     var modal = document.getElementById('move-modal');
     if (modal) modal.classList.add('hidden');
+}
+
+// ========== 分享 ==========
+
+function showShareModal(element) {
+    var id = element.getAttribute('data-id');
+    var name = element.getAttribute('data-name');
+    var type = element.getAttribute('data-type');
+    var modal = document.getElementById('share-modal');
+    var idInput = document.getElementById('share-item-id');
+    var typeInput = document.getElementById('share-item-type');
+    var nameInput = document.getElementById('share-project-name');
+
+    if (modal && idInput && typeInput && nameInput) {
+        idInput.value = id;
+        typeInput.value = type;
+        nameInput.value = name;
+        document.getElementById('share-form-view').classList.remove('hidden');
+        document.getElementById('share-success-view').classList.add('hidden');
+        document.querySelectorAll('[id^="dropdown-"]').forEach(function(el) { el.classList.add('hidden'); });
+        modal.classList.remove('hidden');
+    }
+}
+
+function hideShareModal() {
+    var modal = document.getElementById('share-modal');
+    if (modal) modal.classList.add('hidden');
+    document.getElementById('share-form-view').classList.remove('hidden');
+    document.getElementById('share-success-view').classList.add('hidden');
+    var passwordInput = document.getElementById('share-password');
+    if (passwordInput) passwordInput.value = '';
+    var expiresSelect = document.getElementById('share-expires');
+    if (expiresSelect) expiresSelect.value = '7d';
+}
+
+function copyShareLink() {
+    var linkInput = document.getElementById('share-link');
+    if (linkInput) {
+        linkInput.select();
+        navigator.clipboard.writeText(linkInput.value).then(function() {
+            showMessage('链接已复制到剪贴板');
+        }).catch(function() {
+            document.execCommand('copy');
+            showMessage('链接已复制到剪贴板');
+        });
+    }
 }
 
 function buildFolderPath(folder, folderMap) {
