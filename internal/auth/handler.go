@@ -98,7 +98,7 @@ func (h *Handler) Refresh(c *gin.Context) {
 	userID, err := h.service.ValidateRefreshToken(refreshToken)
 	if err != nil {
 		// 无效 token，清除 cookie
-		c.SetCookie("refresh_token", "", -1, "/", "", false, true)
+		c.SetCookie("refresh_token", "", -1, "/", "", c.Request.TLS != nil, true)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
@@ -130,6 +130,6 @@ func (h *Handler) Logout(c *gin.Context) {
 	if refreshToken, err := c.Cookie("refresh_token"); err == nil && refreshToken != "" {
 		h.service.RevokeRefreshToken(refreshToken)
 	}
-	c.SetCookie("refresh_token", "", -1, "/", "", false, true)
+	c.SetCookie("refresh_token", "", -1, "/", "", c.Request.TLS != nil, true)
 	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
 }
