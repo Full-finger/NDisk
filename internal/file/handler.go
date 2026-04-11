@@ -248,8 +248,7 @@ func (h *Handler) CreateFolderDownloadLink(c *gin.Context) {
 	}
 
 	// 验证文件夹归属
-	var folder File
-	if err := h.service.db.Where("id = ? AND user_id = ? AND is_dir = ?", folderID, userID, true).First(&folder).Error; err != nil {
+	if _, err := h.service.GetFolder(userID, uint(folderID)); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "folder not found"})
 		return
 	}

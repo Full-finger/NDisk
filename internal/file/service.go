@@ -234,6 +234,15 @@ func (s *Service) GetFile(userID uint, fileID uint) (*File, error) {
 	return &file, nil
 }
 
+// GetFolder 获取文件夹信息
+func (s *Service) GetFolder(userID uint, folderID uint) (*File, error) {
+	var folder File
+	if err := s.db.Where("id = ? AND user_id = ? AND is_dir = ?", folderID, userID, true).First(&folder).Error; err != nil {
+		return nil, err
+	}
+	return &folder, nil
+}
+
 // ETag 生成文件ETag
 func (f *File) ETag() string {
 	return fmt.Sprintf(`"%x-%d"`, f.ID, f.Size)
