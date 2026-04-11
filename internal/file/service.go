@@ -133,6 +133,23 @@ func (s *Service) moveStorage(srcKey, dstKey string) error {
 
 // 创建文件夹
 func (s *Service) CreateFolder(userID uint, name string, parentID *uint) (*File, error) {
+	name = strings.TrimSpace(name)
+	if err := validateName(name); err != nil {
+		return nil, err
+	}
+
+	// 检查同一目录下是否存在同名项
+	query := s.db.Where("user_id = ? AND name = ?", userID, name)
+	if parentID == nil {
+		query = query.Where("parent_id IS NULL")
+	} else {
+		query = query.Where("parent_id = ?", *parentID)
+	}
+	var existing File
+	if err := query.First(&existing).Error; err == nil {
+		return nil, fmt.Errorf("同名文件或文件夹已存在")
+	}
+
 	folder := &File{
 		UserID:   userID,
 		ParentID: parentID,
