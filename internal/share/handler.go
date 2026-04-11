@@ -1,6 +1,7 @@
 package share
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -204,4 +205,86 @@ func (h *Handler) downloadFolder(c *gin.Context, share *Share) {
 	c.Header("Content-Length", strconv.FormatInt(zipInfo.Size(), 10))
 	c.Status(http.StatusOK)
 	io.Copy(c.Writer, zipFile)
+}
+
+// ListShares 列出当前用户所有分享（需要 JWT 认证）
+func (h *Handler) ListShares(c *gin.Context) {
+	userID := c.GetUint("user_id")
+
+	shares, err := h.shareService.ListShares(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	type shareItem struct {
+		ID          uint    `json:"id"`
+		ShareToken  string  `json:"share_token"`
+		ProjectName string  `json:"project_name"`
+		ItemName    string  `json:"item_name"`
+		IsFolder    bool    `json:"is_folder"`
+		ItemID      uint    `json:"item_id"`
+		HasPassword bool    `json:"has_password"`
+		ExpiresAt   *string `json:"expires_at"`
+		CreatedAt   string  `json:"created_at"`
+	}
+
+	items := make([]shareItem, 0, len(shares))
+	for _, s := range shares {
+		var expiresAtStr *string
+		if s.ExpiresAt != nil {
+			str := s.ExpiresAt.Format("2006-01-02 15:04")
+			expiresAtStr = &str
+		}
+
+		itemName := h.GetShareItemName(&s)
+
+		item := shareItem{
+			ID:          s.ID,
+			ShareToken:  s.ShareToken,
+			ProjectName: s.ProjectName,
+			ItemName:    itemName,
+			IsFolder:    s.IsFolder,
+			ItemID:      s.ItemID,
+			HasPassword: h.shareService.HasPassword(&s),
+			ExpiresAt:   expiresAtStr,
+			CreatedAt:   s.CreatedAt.Format("2006-01-02 15:04"),
+		}
+		items = append(items, item)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"shares": items})
+}
+
+// DeleteShare 删除指定分享（需要 JWT 认证）
+func (h *Handler) DeleteShare(c *gin.Context) {
+	userID := c.GetUint("user_id")
+
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的分享 ID"})
+		return
+	}
+
+	if err := h.shareService.DeleteShare(userID, uint(id)); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
+}
+
+// GetShareItemName 获取分享项名称（内部辅助）
+func (h *Handler) GetShareItemName(s *Share) string {
+	if s.IsFolder {
+		if folder, err := h.fileService.GetFolder(s.UserID, s.ItemID); err == nil {
+			return folder.Name
+		}
+	} else {
+		if f, err := h.fileService.GetFile(s.UserID, s.ItemID); err == nil {
+			return f.Name
+		}
+	}
+	return fmt.Sprintf("(已删除的%s)", map[bool]string{true: "文件夹", false: "文件"}[s.IsFolder])
 }

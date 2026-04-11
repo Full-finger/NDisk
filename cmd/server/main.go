@@ -70,6 +70,13 @@ func main() {
 		filesGroup.GET("", webHandler.FilesPage)
 	}
 
+	// 分享管理页面（需要认证 - refresh token cookie）
+	shareGroup := r.Group("/share")
+	shareGroup.Use(webHandler.CookieAuthMiddleware())
+	{
+		shareGroup.GET("", webHandler.SharesPage)
+	}
+
 	// 认证路由
 	authRateLimiter := auth.NewRateLimiter(5, time.Minute)
 	authGroup := r.Group("/api/auth")
@@ -116,6 +123,8 @@ func main() {
 
 		// 分享（需要认证）
 		api.POST("/shares", shareHandler.CreateShare)
+		api.GET("/shares", shareHandler.ListShares)
+		api.DELETE("/shares/:id", shareHandler.DeleteShare)
 	}
 
 	// 首页重定向

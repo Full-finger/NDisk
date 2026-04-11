@@ -66,6 +66,18 @@ func (h *Handler) FilesPage(c *gin.Context) {
 	})
 }
 
+// SharesPage 渲染"我的分享"页面（需要认证）
+func (h *Handler) SharesPage(c *gin.Context) {
+	username := c.GetString("username")
+	accessToken := c.GetString("access_token")
+
+	c.HTML(http.StatusOK, "my_shares", gin.H{
+		"title":       "我的分享",
+		"username":    username,
+		"accessToken": accessToken,
+	})
+}
+
 // IndexRedirect 首页重定向：有有效 refresh token 则跳转 /files，否则跳转 /login
 func (h *Handler) IndexRedirect(c *gin.Context) {
 	refreshToken, err := c.Cookie("refresh_token")

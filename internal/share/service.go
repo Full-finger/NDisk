@@ -105,6 +105,27 @@ func (s *Service) VerifyPassword(share *Share, password string) bool {
 	return err == nil
 }
 
+// ListShares 查询用户所有分享记录
+func (s *Service) ListShares(userID uint) ([]Share, error) {
+	var shares []Share
+	if err := s.db.Where("user_id = ?", userID).Order("created_at DESC").Find(&shares).Error; err != nil {
+		return nil, err
+	}
+	return shares, nil
+}
+
+// DeleteShare 删除指定分享（需验证归属）
+func (s *Service) DeleteShare(userID, shareID uint) error {
+	result := s.db.Where("id = ? AND user_id = ?", shareID, userID).Delete(&Share{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("分享不存在或无权删除")
+	}
+	return nil
+}
+
 // CleanExpiredShares 清理过期的分享记录
 func (s *Service) CleanExpiredShares() {
 	s.db.Where("expires_at IS NOT NULL AND expires_at < ?", time.Now()).Delete(&Share{})
