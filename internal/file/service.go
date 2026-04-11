@@ -126,20 +126,9 @@ func (s *Service) Upload(userID uint, parentID *uint, filename string, size int6
 	return file, nil
 }
 
-// moveStorage 移动存储文件（通过复制+删除实现）
+// moveStorage 移动存储文件（通过 os.Rename 实现零拷贝）
 func (s *Service) moveStorage(srcKey, dstKey string) error {
-	reader, err := s.storage.Open(srcKey)
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-
-	if err := s.storage.Save(dstKey, reader); err != nil {
-		return err
-	}
-
-	s.storage.Delete(srcKey)
-	return nil
+	return s.storage.Rename(srcKey, dstKey)
 }
 
 // 创建文件夹
@@ -890,4 +879,3 @@ func (s *Service) ValidateDownloadLink(token string) *DownloadLink {
 func (s *Service) CleanExpiredDownloadLinks() {
 	s.db.Where("expires_at < ?", time.Now()).Delete(&DownloadLink{})
 }
-

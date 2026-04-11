@@ -71,6 +71,13 @@ func (l *LocalStorage) Exists(key string) bool {
 	return err == nil
 }
 
+func (l *LocalStorage) Rename(srcKey, dstKey string) error {
+	src := filepath.Join(l.BasePath, srcKey)
+	dst := filepath.Join(l.BasePath, dstKey)
+	os.MkdirAll(filepath.Dir(dst), 0755)
+	return os.Rename(src, dst)
+}
+
 // Append 向已有文件追加数据，如果文件不存在则创建
 func (l *LocalStorage) Append(key string, reader io.Reader) error {
 	path := filepath.Join(l.BasePath, key)

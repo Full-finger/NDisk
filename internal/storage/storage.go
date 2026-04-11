@@ -9,4 +9,5 @@ type Storage interface {
 	OpenRange(key string, offset, length int64) (io.ReadCloser, error)
 	Delete(key string) error
 	Exists(key string) bool
+	Rename(srcKey, dstKey string) error
 }
