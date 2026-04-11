@@ -326,35 +326,57 @@ func (s *Service) Rename(userID uint, fileID uint, newName string) (*File, error
 	return &file, nil
 }
 
-// chunkKey 返回 chunk 临时文件的存储 key
-func chunkKey(identifier string, chunkNumber int) string {
-	return fmt.Sprintf(".chunks/%s/%d", identifier, chunkNumber)
+// validateIdentifier 校验分片标识符，防止路径遍历
+func validateIdentifier(identifier string) error {
+	if identifier == "" {
+		return fmt.Errorf("identifier 不能为空")
+	}
+	for _, r := range identifier {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_') {
+			return fmt.Errorf("identifier 包含非法字符")
+		}
+	}
+	return nil
 }
 
-// chunkCompleteMarker 返回上传完成的标记文件 key
-func chunkCompleteMarker(identifier string) string {
-	return fmt.Sprintf(".chunks/%s/.complete", identifier)
+// chunkKey 返回 chunk 临时文件的存储 key（按用户隔离）
+func chunkKey(userID uint, identifier string, chunkNumber int) string {
+	return fmt.Sprintf(".chunks/%d/%s/%d", userID, identifier, chunkNumber)
+}
+
+// chunkCompleteMarker 返回上传完成的标记文件 key（按用户隔离）
+func chunkCompleteMarker(userID uint, identifier string) string {
+	return fmt.Sprintf(".chunks/%d/%s/.complete", userID, identifier)
 }
 
 // SaveChunk 保存单个分块到临时存储
-func (s *Service) SaveChunk(identifier string, chunkNumber int, reader io.Reader) error {
-	key := chunkKey(identifier, chunkNumber)
+func (s *Service) SaveChunk(userID uint, identifier string, chunkNumber int, reader io.Reader) error {
+	if err := validateIdentifier(identifier); err != nil {
+		return err
+	}
+	key := chunkKey(userID, identifier, chunkNumber)
 	return s.storage.Save(key, reader)
 }
 
 // ChunkExists 检查分块是否已上传
-func (s *Service) ChunkExists(identifier string, chunkNumber int) bool {
+func (s *Service) ChunkExists(userID uint, identifier string, chunkNumber int) bool {
+	if err := validateIdentifier(identifier); err != nil {
+		return false
+	}
 	// 先检查完成标记，如果文件已合并完成，所有 chunk 都视为已存在
-	if s.storage.Exists(chunkCompleteMarker(identifier)) {
+	if s.storage.Exists(chunkCompleteMarker(userID, identifier)) {
 		return true
 	}
-	return s.storage.Exists(chunkKey(identifier, chunkNumber))
+	return s.storage.Exists(chunkKey(userID, identifier, chunkNumber))
 }
 
 // AllChunksUploaded 检查所有分块是否都已上传
-func (s *Service) AllChunksUploaded(identifier string, totalChunks int) bool {
+func (s *Service) AllChunksUploaded(userID uint, identifier string, totalChunks int) bool {
+	if err := validateIdentifier(identifier); err != nil {
+		return false
+	}
 	for i := 1; i <= totalChunks; i++ {
-		if !s.storage.Exists(chunkKey(identifier, i)) {
+		if !s.storage.Exists(chunkKey(userID, identifier, i)) {
 			return false
 		}
 	}
@@ -363,12 +385,16 @@ func (s *Service) AllChunksUploaded(identifier string, totalChunks int) bool {
 
 // UploadFromChunks 合并所有分块并创建文件记录
 func (s *Service) UploadFromChunks(userID uint, parentID *uint, filename string, totalSize int64, identifier string, totalChunks int) (*File, error) {
+	if err := validateIdentifier(identifier); err != nil {
+		return nil, err
+	}
+
 	// 按顺序打开所有分块
 	var readers []io.Reader
 	var closers []io.ReadCloser
 
 	for i := 1; i <= totalChunks; i++ {
-		key := chunkKey(identifier, i)
+		key := chunkKey(userID, identifier, i)
 		reader, err := s.storage.Open(key)
 		if err != nil {
 			// 清理已打开的 reader
@@ -397,11 +423,11 @@ func (s *Service) UploadFromChunks(userID uint, parentID *uint, filename string,
 	}
 
 	// 创建完成标记（在清理分块之前，防止并发问题）
-	s.storage.Save(chunkCompleteMarker(identifier), strings.NewReader(""))
+	s.storage.Save(chunkCompleteMarker(userID, identifier), strings.NewReader(""))
 
 	// 清理临时分块文件
 	for i := 1; i <= totalChunks; i++ {
-		s.storage.Delete(chunkKey(identifier, i))
+		s.storage.Delete(chunkKey(userID, identifier, i))
 	}
 
 	// 使父目录的 ZIP 缓存失效

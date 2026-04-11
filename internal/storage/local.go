@@ -1,9 +1,11 @@
 package storage
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type rangeReader struct {
@@ -28,8 +30,19 @@ func NewLocal(basePath string) *LocalStorage {
 	return &LocalStorage{BasePath: basePath}
 }
 
+func (l *LocalStorage) safePath(key string) (string, error) {
+	p := filepath.Join(l.BasePath, key)
+	if !strings.HasPrefix(p, l.BasePath+string(filepath.Separator)) && p != l.BasePath {
+		return "", fmt.Errorf("path traversal detected")
+	}
+	return p, nil
+}
+
 func (l *LocalStorage) Save(key string, reader io.Reader) error {
-	path := filepath.Join(l.BasePath, key)
+	path, err := l.safePath(key)
+	if err != nil {
+		return err
+	}
 	os.MkdirAll(filepath.Dir(path), 0755)
 
 	f, err := os.Create(path)
@@ -43,12 +56,18 @@ func (l *LocalStorage) Save(key string, reader io.Reader) error {
 }
 
 func (l *LocalStorage) Open(key string) (io.ReadCloser, error) {
-	path := filepath.Join(l.BasePath, key)
+	path, err := l.safePath(key)
+	if err != nil {
+		return nil, err
+	}
 	return os.Open(path)
 }
 
 func (l *LocalStorage) OpenRange(key string, offset, length int64) (io.ReadCloser, error) {
-	path := filepath.Join(l.BasePath, key)
+	path, err := l.safePath(key)
+	if err != nil {
+		return nil, err
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -61,26 +80,41 @@ func (l *LocalStorage) OpenRange(key string, offset, length int64) (io.ReadClose
 }
 
 func (l *LocalStorage) Delete(key string) error {
-	path := filepath.Join(l.BasePath, key)
+	path, err := l.safePath(key)
+	if err != nil {
+		return err
+	}
 	return os.Remove(path)
 }
 
 func (l *LocalStorage) Exists(key string) bool {
-	path := filepath.Join(l.BasePath, key)
-	_, err := os.Stat(path)
+	path, err := l.safePath(key)
+	if err != nil {
+		return false
+	}
+	_, err = os.Stat(path)
 	return err == nil
 }
 
 func (l *LocalStorage) Rename(srcKey, dstKey string) error {
-	src := filepath.Join(l.BasePath, srcKey)
-	dst := filepath.Join(l.BasePath, dstKey)
+	src, err := l.safePath(srcKey)
+	if err != nil {
+		return err
+	}
+	dst, err := l.safePath(dstKey)
+	if err != nil {
+		return err
+	}
 	os.MkdirAll(filepath.Dir(dst), 0755)
 	return os.Rename(src, dst)
 }
 
 // Append 向已有文件追加数据，如果文件不存在则创建
 func (l *LocalStorage) Append(key string, reader io.Reader) error {
-	path := filepath.Join(l.BasePath, key)
+	path, err := l.safePath(key)
+	if err != nil {
+		return err
+	}
 	os.MkdirAll(filepath.Dir(path), 0755)
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
@@ -95,6 +129,9 @@ func (l *LocalStorage) Append(key string, reader io.Reader) error {
 
 // DeleteDir 删除整个目录及其内容
 func (l *LocalStorage) DeleteDir(key string) error {
-	path := filepath.Join(l.BasePath, key)
+	path, err := l.safePath(key)
+	if err != nil {
+		return err
+	}
 	return os.RemoveAll(path)
 }

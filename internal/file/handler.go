@@ -29,6 +29,8 @@ func NewHandler(service *Service, jwtSecret string) *Handler {
 
 // TestChunk 处理 GET 请求，检查分块是否已上传
 func (h *Handler) TestChunk(c *gin.Context) {
+	userID := c.GetUint("user_id")
+
 	identifier := c.Query("resumableIdentifier")
 	chunkNumberStr := c.Query("resumableChunkNumber")
 
@@ -43,7 +45,7 @@ func (h *Handler) TestChunk(c *gin.Context) {
 		return
 	}
 
-	if h.service.ChunkExists(identifier, chunkNumber) {
+	if h.service.ChunkExists(userID, identifier, chunkNumber) {
 		c.JSON(http.StatusOK, gin.H{"message": "chunk already uploaded"})
 	} else {
 		c.JSON(http.StatusNotFound, gin.H{"error": "chunk not found"})
@@ -100,12 +102,12 @@ func (h *Handler) uploadChunk(c *gin.Context, userID uint, chunkNumberStr, ident
 	}
 	defer file.Close()
 
-	if err := h.service.SaveChunk(identifier, chunkNumber, file); err != nil {
+	if err := h.service.SaveChunk(userID, identifier, chunkNumber, file); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save chunk"})
 		return
 	}
 
-	if h.service.AllChunksUploaded(identifier, totalChunks) {
+	if h.service.AllChunksUploaded(userID, identifier, totalChunks) {
 		var parentID *uint
 		if pid := c.PostForm("parent_id"); pid != "" {
 			if id, err := strconv.ParseUint(pid, 10, 32); err == nil {
