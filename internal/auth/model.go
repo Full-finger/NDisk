@@ -9,6 +9,7 @@ import (
 type User struct {
 	ID        uint   `gorm:"primaryKey"`
 	Username  string `gorm:"uniqueIndex;size:64"`
+	Nickname  string `gorm:"size:64"`
 	Password  string `gorm:"size:255"` // bcrypt hash
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -47,4 +48,10 @@ type LoginResponse struct {
 type UserInfo struct {
 	ID       uint   `json:"id"`
 	Username string `json:"username"`
+	Nickname string `json:"nickname"`
+}
+
+// UpdateProfileRequest 更新个人资料请求
+type UpdateProfileRequest struct {
+	Nickname string `json:"nickname" binding:"required,min=1,max=64"`
 }

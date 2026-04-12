@@ -41,6 +41,7 @@ func (h *Handler) RegisterPage(c *gin.Context) {
 func (h *Handler) FilesPage(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	username := c.GetString("username")
+	nickname := c.GetString("nickname")
 	accessToken := c.GetString("access_token")
 
 	var parentID *uint
@@ -58,6 +59,7 @@ func (h *Handler) FilesPage(c *gin.Context) {
 	c.HTML(http.StatusOK, "files", gin.H{
 		"title":       "文件管理",
 		"username":    username,
+		"nickname":    nickname,
 		"files":       files,
 		"folders":     folders,
 		"parentID":    parentID,
@@ -69,11 +71,13 @@ func (h *Handler) FilesPage(c *gin.Context) {
 // SharesPage 渲染"我的分享"页面（需要认证）
 func (h *Handler) SharesPage(c *gin.Context) {
 	username := c.GetString("username")
+	nickname := c.GetString("nickname")
 	accessToken := c.GetString("access_token")
 
 	c.HTML(http.StatusOK, "shares", gin.H{
 		"title":       "我的分享",
 		"username":    username,
+		"nickname":    nickname,
 		"accessToken": accessToken,
 	})
 }
@@ -81,11 +85,27 @@ func (h *Handler) SharesPage(c *gin.Context) {
 // NFSPage 渲染 NFS Token 管理页面（需要认证）
 func (h *Handler) NFSPage(c *gin.Context) {
 	username := c.GetString("username")
+	nickname := c.GetString("nickname")
 	accessToken := c.GetString("access_token")
 
 	c.HTML(http.StatusOK, "nfs", gin.H{
 		"title":       "NFS 挂载管理",
 		"username":    username,
+		"nickname":    nickname,
+		"accessToken": accessToken,
+	})
+}
+
+// ProfilePage 渲染个人资料页面（需要认证）
+func (h *Handler) ProfilePage(c *gin.Context) {
+	username := c.GetString("username")
+	nickname := c.GetString("nickname")
+	accessToken := c.GetString("access_token")
+
+	c.HTML(http.StatusOK, "profile", gin.H{
+		"title":       "个人资料",
+		"username":    username,
+		"nickname":    nickname,
 		"accessToken": accessToken,
 	})
 }
@@ -135,8 +155,13 @@ func (h *Handler) CookieAuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		nickname := user.Nickname
+		if nickname == "" {
+			nickname = user.Username
+		}
 		c.Set("user_id", user.ID)
 		c.Set("username", user.Username)
+		c.Set("nickname", nickname)
 		c.Set("access_token", accessToken)
 
 		c.Next()

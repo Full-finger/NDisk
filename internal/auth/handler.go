@@ -116,11 +116,16 @@ func (h *Handler) Refresh(c *gin.Context) {
 		return
 	}
 
+	nickname := user.Nickname
+	if nickname == "" {
+		nickname = user.Username
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"access_token": accessToken,
 		"user": UserInfo{
 			ID:       user.ID,
 			Username: user.Username,
+			Nickname: nickname,
 		},
 	})
 }
@@ -132,4 +137,21 @@ func (h *Handler) Logout(c *gin.Context) {
 	}
 	c.SetCookie("refresh_token", "", -1, "/", "", c.Request.TLS != nil, true)
 	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
+}
+
+// UpdateProfile 更新用户资料（昵称）
+func (h *Handler) UpdateProfile(c *gin.Context) {
+	var req UpdateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "昵称长度需要在 1-64 个字符之间"})
+		return
+	}
+
+	userID := c.GetUint("user_id")
+	if err := h.service.UpdateNickname(userID, req.Nickname); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "更新成功", "nickname": req.Nickname})
 }

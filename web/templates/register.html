@@ -287,7 +287,7 @@
                                     spellcheck="false"
                                     class="form-input w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-xl font-semibold text-gray-900 placeholder-gray-400 focus-ring">
                             </div>
-                            <p class="mt-1.5 text-xs text-gray-400 font-medium">用户名将用于登录，注册后不可修改</p>
+                            <p class="mt-1.5 text-xs text-gray-400 font-medium">用户名必须以字母或下划线开头，只能包含字母、数字和下划线，注册后不可修改</p>
                         </div>
 
                         <!-- 密码 -->
@@ -520,6 +520,10 @@
 
             if (username.length < 3) {
                 showError('用户名至少需要 3 个字符');
+                return;
+            }
+            if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(username)) {
+                showError('用户名必须以字母或下划线开头，只能包含字母、数字和下划线');
                 return;
             }
 

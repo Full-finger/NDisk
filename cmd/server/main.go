@@ -102,6 +102,13 @@ func main() {
 		nfsGroup.GET("", webHandler.NFSPage)
 	}
 
+	// 个人资料页面（需要认证 - refresh token cookie）
+	profileGroup := r.Group("/profile")
+	profileGroup.Use(webHandler.CookieAuthMiddleware())
+	{
+		profileGroup.GET("", webHandler.ProfilePage)
+	}
+
 	// 认证路由
 	authRateLimiter := auth.NewRateLimiter(5, time.Minute)
 	authGroup := r.Group("/api/auth")
@@ -155,6 +162,9 @@ func main() {
 		api.POST("/nfs/tokens", nfsAPIHandler.CreateToken)
 		api.GET("/nfs/tokens", nfsAPIHandler.ListTokens)
 		api.DELETE("/nfs/tokens/:id", nfsAPIHandler.DeleteToken)
+
+		// 个人资料（需要认证）
+		api.PUT("/auth/profile", authHandler.UpdateProfile)
 	}
 
 	// 首页重定向

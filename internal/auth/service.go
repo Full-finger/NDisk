@@ -51,7 +51,7 @@ func (s *Service) Register(req *RegisterRequest) (*User, error) {
 		return nil, err
 	}
 
-	user := &User{Username: req.Username, Password: string(hashed)}
+	user := &User{Username: req.Username, Nickname: req.Username, Password: string(hashed)}
 	if err := s.db.Create(user).Error; err != nil {
 		return nil, err
 	}
@@ -60,9 +60,9 @@ func (s *Service) Register(req *RegisterRequest) (*User, error) {
 
 func validateUsername(username string) error {
 	username = strings.TrimSpace(username)
-	matched, _ := regexp.MatchString("^[a-zA-Z0-9_]+$", username)
+	matched, _ := regexp.MatchString("^[a-zA-Z_][a-zA-Z0-9_]*$", username)
 	if !matched {
-		return errors.New("用户名只能包含字母、数字和下划线")
+		return errors.New("用户名必须以字母或下划线开头，只能包含字母、数字和下划线")
 	}
 	return nil
 }
@@ -200,12 +200,17 @@ func (s *Service) Login(req *LoginRequest) (*LoginResponse, error) {
 		return nil, err
 	}
 
+	nickname := user.Nickname
+	if nickname == "" {
+		nickname = user.Username
+	}
 	return &LoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		User: UserInfo{
 			ID:       user.ID,
 			Username: user.Username,
+			Nickname: nickname,
 		},
 	}, nil
 }
@@ -217,6 +222,11 @@ func (s *Service) GetUserByID(id uint) (*User, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+// UpdateNickname 更新用户昵称
+func (s *Service) UpdateNickname(userID uint, nickname string) error {
+	return s.db.Model(&User{}).Where("id = ?", userID).Update("nickname", nickname).Error
 }
 
 // CleanExpiredRefreshTokens 清理过期的 refresh token
