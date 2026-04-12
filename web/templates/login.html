@@ -4,42 +4,443 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#ffffff">
     <title>登录 - NDisk</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['Nunito', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="/static/js/app.js"></script>
+    <style>
+        @media (prefers-reduced-motion: reduce) {
+            *, ::before, ::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        * { font-family: 'Nunito', sans-serif; }
+
+        .focus-ring:focus-visible {
+            outline: 3px solid #3b82f6;
+            outline-offset: 2px;
+        }
+
+        .btn-bounce {
+            transition: transform 0.15s ease, box-shadow 0.2s ease;
+        }
+        .btn-bounce:hover {
+            transform: scale(1.01);
+            box-shadow: 0 8px 25px -5px rgba(59, 130, 246, 0.4);
+        }
+        .btn-bounce:active {
+            transform: scale(0.99);
+        }
+
+        /* 浮动装饰球 */
+        .float-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(60px);
+            opacity: 0.5;
+            animation: floatOrb 8s ease-in-out infinite;
+        }
+        .float-orb:nth-child(2) {
+            animation-delay: -3s;
+            animation-duration: 10s;
+        }
+        .float-orb:nth-child(3) {
+            animation-delay: -5s;
+            animation-duration: 12s;
+        }
+
+        @keyframes floatOrb {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -20px) scale(1.05); }
+            66% { transform: translate(-20px, 15px) scale(0.95); }
+        }
+
+        /* 表单输入框 */
+        .form-input {
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .form-input:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+
+        /* 卡片入场 */
+        .card-enter {
+            animation: cardEnter 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes cardEnter {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* 品牌文字渐变 */
+        .brand-gradient {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* 密码切换按钮 */
+        .pwd-toggle {
+            transition: color 0.15s ease;
+        }
+        .pwd-toggle:hover {
+            color: #3b82f6;
+        }
+
+        /* 装饰线条 */
+        .deco-line {
+            background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.3), transparent);
+            height: 1px;
+        }
+
+        /* 点阵背景 */
+        .dot-grid {
+            background-image: radial-gradient(circle, #e2e8f0 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        /* 左侧装饰区 */
+        .hero-bg {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d1b69 40%, #1a1a2e 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-bg::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.05) 1px, transparent 0);
+            background-size: 32px 32px;
+        }
+
+        /* 浮动图标 */
+        .hero-icon {
+            animation: floatIcon 6s ease-in-out infinite;
+        }
+        .hero-icon:nth-child(2) { animation-delay: -2s; }
+        .hero-icon:nth-child(3) { animation-delay: -4s; }
+
+        @keyframes floatIcon {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-12px) rotate(3deg); }
+        }
+
+        /* 输入框标签浮动 */
+        .input-group { position: relative; }
+
+        /* 加载动画 */
+        .spinner {
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-<div class="flex items-center justify-center min-h-screen">
-    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">登录</h1>
-        
-        <div id="error-message" class="hidden mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm"></div>
-        
-        <form id="login-form" class="space-y-4">
-            <div>
-                <label for="username" class="block text-sm font-medium text-gray-700 mb-1">用户名</label>
-                <input type="text" id="username" name="username" required
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+<body class="bg-gray-50 min-h-screen">
+    <div class="min-h-screen flex">
+        <!-- 左侧装饰区 - 桌面端显示 -->
+        <div class="hidden lg:flex lg:w-[480px] xl:w-[560px] hero-bg flex-col justify-between p-10 xl:p-12 relative shrink-0">
+            <!-- 装饰浮动球 -->
+            <div class="float-orb w-64 h-64 bg-blue-500/20 top-10 -left-20"></div>
+            <div class="float-orb w-48 h-48 bg-purple-500/20 bottom-20 right-10"></div>
+            <div class="float-orb w-32 h-32 bg-pink-500/15 top-1/2 left-1/3"></div>
+
+            <!-- 顶部品牌 -->
+            <div class="relative z-10">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                        </svg>
+                    </div>
+                    <span class="text-white font-extrabold text-xl tracking-tight">NDisk</span>
+                </div>
             </div>
-            
-            <div>
-                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">密码</label>
-                <input type="password" id="password" name="password" required
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+
+            <!-- 中间内容 -->
+            <div class="relative z-10 space-y-8">
+                <div>
+                    <h2 class="text-4xl xl:text-5xl font-black text-white leading-tight">
+                        安全存储<br>
+                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 via-purple-300 to-pink-300">轻松分享</span>
+                    </h2>
+                    <p class="mt-4 text-lg text-white/60 font-medium leading-relaxed max-w-sm">
+                        你的个人云盘，随时随地访问文件，一键分享给世界
+                    </p>
+                </div>
+
+                <!-- 特性列表 -->
+                <div class="space-y-4">
+                    <div class="flex items-center gap-3 text-white/70">
+                        <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                            <svg class="w-4 h-4 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold">断点续传，大文件无忧</span>
+                    </div>
+                    <div class="flex items-center gap-3 text-white/70">
+                        <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                            <svg class="w-4 h-4 text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold">密码保护，安全分享</span>
+                    </div>
+                    <div class="flex items-center gap-3 text-white/70">
+                        <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                            <svg class="w-4 h-4 text-pink-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold">NFS 挂载，本地访问</span>
+                    </div>
+                </div>
             </div>
-            
-            <button type="submit"
-                class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
-                登录
-            </button>
-        </form>
-        
-        <p class="mt-4 text-center text-sm text-gray-600">
-            还没有账号？<a href="/register" class="text-blue-600 hover:underline">立即注册</a>
-        </p>
+
+            <!-- 底部装饰 -->
+            <div class="relative z-10 flex items-center gap-6">
+                <div class="hero-icon w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-blue-300/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                    </svg>
+                </div>
+                <div class="hero-icon w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-purple-300/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                    </svg>
+                </div>
+                <div class="hero-icon w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-pink-300/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧表单区 -->
+        <div class="flex-1 flex items-center justify-center p-6 sm:p-8 lg:p-12 dot-grid relative">
+            <!-- 移动端浮动装饰球 -->
+            <div class="lg:hidden float-orb w-48 h-48 bg-blue-400/20 -top-10 -right-10"></div>
+            <div class="lg:hidden float-orb w-36 h-36 bg-purple-400/15 bottom-10 -left-10"></div>
+
+            <div class="w-full max-w-md relative z-10">
+                <!-- 移动端品牌 -->
+                <div class="lg:hidden flex items-center justify-center gap-3 mb-8">
+                    <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center shadow-lg">
+                        <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                        </svg>
+                    </div>
+                    <span class="font-black text-2xl text-gray-900 tracking-tight">NDisk</span>
+                </div>
+
+                <!-- 登录卡片 -->
+                <div class="card-enter bg-white rounded-3xl shadow-xl border-2 border-gray-100 p-8 sm:p-10">
+                    <!-- 标题 -->
+                    <div class="text-center mb-8">
+                        <h1 class="text-2xl sm:text-3xl font-black text-gray-900">欢迎回来</h1>
+                        <p class="mt-2 text-gray-500 font-medium">登录你的 NDisk 账号</p>
+                    </div>
+
+                    <!-- 错误提示 -->
+                    <div id="error-message" class="hidden mb-6 p-4 rounded-xl bg-red-50 border-2 border-red-200 text-red-700 text-sm font-semibold flex items-center gap-2" role="alert">
+                        <svg class="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                        <span id="error-text"></span>
+                    </div>
+
+                    <!-- 登录表单 -->
+                    <form id="login-form" class="space-y-5">
+                        <!-- 用户名 -->
+                        <div class="input-group">
+                            <label for="username" class="block text-sm font-bold text-gray-700 mb-2">用户名</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                    </svg>
+                                </div>
+                                <input type="text" id="username" name="username" required
+                                    placeholder="请输入用户名…"
+                                    autocomplete="username"
+                                    class="form-input w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-xl font-semibold text-gray-900 placeholder-gray-400 focus-ring">
+                            </div>
+                        </div>
+
+                        <!-- 密码 -->
+                        <div class="input-group">
+                            <label for="password" class="block text-sm font-bold text-gray-700 mb-2">密码</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                    </svg>
+                                </div>
+                                <input type="password" id="password" name="password" required
+                                    placeholder="请输入密码…"
+                                    autocomplete="current-password"
+                                    class="form-input w-full pl-12 pr-12 py-3.5 border-2 border-gray-200 rounded-xl font-semibold text-gray-900 placeholder-gray-400 focus-ring">
+                                <button type="button" onclick="togglePassword()" class="absolute inset-y-0 right-0 pr-4 flex items-center pwd-toggle text-gray-400 focus-ring rounded-lg" aria-label="显示/隐藏密码">
+                                    <svg id="pwd-eye-off" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                                    </svg>
+                                    <svg id="pwd-eye-on" class="w-5 h-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 登录按钮 -->
+                        <button type="submit" id="login-btn"
+                            class="btn-bounce w-full py-3.5 px-6 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold text-base rounded-xl shadow-lg focus-ring flex items-center justify-center gap-2">
+                            <span id="login-btn-text">登录</span>
+                            <svg id="login-spinner" class="hidden w-5 h-5 spinner" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </button>
+                    </form>
+
+                    <!-- 分隔线 -->
+                    <div class="flex items-center gap-4 my-6">
+                        <div class="flex-1 deco-line"></div>
+                        <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">或</span>
+                        <div class="flex-1 deco-line"></div>
+                    </div>
+
+                    <!-- 注册链接 -->
+                    <p class="text-center text-sm text-gray-500 font-medium">
+                        还没有账号？
+                        <a href="/register" class="font-bold text-blue-600 hover:text-purple-600 transition-colors focus-ring rounded px-1">
+                            立即注册
+                        </a>
+                    </p>
+                </div>
+
+                <!-- 底部版权 -->
+                <p class="text-center text-xs text-gray-400 font-medium mt-6">
+                    NDisk &copy; 2025 · 安全便捷的文件分享服务
+                </p>
+            </div>
+        </div>
     </div>
-</div>
+
+    <script>
+        // 密码显示/隐藏
+        function togglePassword() {
+            var input = document.getElementById('password');
+            var eyeOff = document.getElementById('pwd-eye-off');
+            var eyeOn = document.getElementById('pwd-eye-on');
+
+            if (input.type === 'password') {
+                input.type = 'text';
+                eyeOff.classList.add('hidden');
+                eyeOn.classList.remove('hidden');
+            } else {
+                input.type = 'password';
+                eyeOff.classList.remove('hidden');
+                eyeOn.classList.add('hidden');
+            }
+        }
+
+        // 显示错误
+        function showError(msg) {
+            var el = document.getElementById('error-message');
+            document.getElementById('error-text').textContent = msg;
+            el.classList.remove('hidden');
+        }
+
+        function hideError() {
+            document.getElementById('error-message').classList.add('hidden');
+        }
+
+        // 设置加载状态
+        function setLoading(loading) {
+            var btn = document.getElementById('login-btn');
+            var text = document.getElementById('login-btn-text');
+            var spinner = document.getElementById('login-spinner');
+
+            if (loading) {
+                btn.disabled = true;
+                btn.classList.add('opacity-80', 'cursor-not-allowed');
+                text.textContent = '登录中…';
+                spinner.classList.remove('hidden');
+            } else {
+                btn.disabled = false;
+                btn.classList.remove('opacity-80', 'cursor-not-allowed');
+                text.textContent = '登录';
+                spinner.classList.add('hidden');
+            }
+        }
+
+        // 表单提交
+        document.getElementById('login-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            hideError();
+            setLoading(true);
+
+            var username = document.getElementById('username').value.trim();
+            var password = document.getElementById('password').value;
+
+            fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: username, password: password })
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (data.access_token) {
+                    setAccessToken(data.access_token);
+                    window.location.href = '/files';
+                } else {
+                    showError(data.error || '登录失败，请重试');
+                    setLoading(false);
+                }
+            })
+            .catch(function() {
+                showError('网络错误，请检查连接后重试');
+                setLoading(false);
+            });
+        });
+
+        // 输入时隐藏错误
+        document.getElementById('username').addEventListener('input', hideError);
+        document.getElementById('password').addEventListener('input', hideError);
+
+        // 自动聚焦用户名
+        document.getElementById('username').focus();
+    </script>
 </body>
 </html>
 {{end}}

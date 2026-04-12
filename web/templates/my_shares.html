@@ -4,211 +4,458 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#ffffff">
     <title>我的分享 - NDisk</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['Nunito', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        },
+                        cute: {
+                            pink: '#ec4899',
+                            purple: '#8b5cf6',
+                            mint: '#10b981',
+                            orange: '#f59e0b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <script>window.__ACCESS_TOKEN__ = "{{.accessToken}}";</script>
     <script src="/static/js/app.js"></script>
+    <style>
+        @media (prefers-reduced-motion: reduce) {
+            *, ::before, ::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        * {
+            font-family: 'Nunito', sans-serif;
+        }
+
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-bounce {
+            transition: transform 0.15s ease;
+        }
+        .btn-bounce:hover {
+            transform: scale(1.02);
+        }
+        .btn-bounce:active {
+            transform: scale(0.98);
+        }
+
+        .focus-ring:focus-visible {
+            outline: 3px solid #3b82f6;
+            outline-offset: 2px;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .row-hover {
+            transition: background-color 0.15s ease;
+        }
+        .row-hover:hover {
+            background-color: #f8fafc;
+        }
+
+        /* 装饰圆点 */
+        .dot-pattern {
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-<div class="min-h-screen">
-    <!-- 顶部导航 -->
-    <nav class="bg-white shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <h1 class="text-xl font-bold text-gray-800">NDisk 我的分享</h1>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <a href="/files" class="text-gray-600 hover:text-blue-600 font-medium">文件管理</a>
-                    <a href="/share" class="text-blue-600 hover:text-blue-800 font-medium">我的分享</a>
-                    <a href="/nfs" class="text-gray-600 hover:text-blue-600 font-medium">NFS 挂载</a>
-                    <span class="text-gray-400">|</span>
-                    <span class="text-gray-600">欢迎，{{.username}}</span>
-                    <button onclick="logout()" class="text-red-600 hover:text-red-800">退出登录</button>
+<body class="bg-gray-50 min-h-screen">
+    <div class="min-h-screen flex flex-col">
+        <!-- 轻微装饰背景 -->
+        <div class="fixed inset-0 dot-pattern pointer-events-none -z-10 opacity-50"></div>
+
+        <!-- 顶部导航 -->
+        <nav class="bg-white border-b-2 border-gray-100 sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16 items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center shadow-md">
+                            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                            </svg>
+                        </div>
+                        <h1 class="text-xl font-extrabold text-gray-900">NDisk</h1>
+                        <span class="hidden sm:inline-block px-2.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-bold rounded-full">分享管理</span>
+                    </div>
+                    <div class="flex items-center gap-1 sm:gap-2">
+                        <a href="/files" class="px-3 py-2 text-sm font-semibold text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-ring">文件管理</a>
+                        <a href="/share" class="px-3 py-2 text-sm font-bold text-blue-600 bg-blue-50 rounded-lg focus-ring" aria-current="page">我的分享</a>
+                        <a href="/nfs" class="px-3 py-2 text-sm font-semibold text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-ring">NFS</a>
+                        <div class="w-px h-6 bg-gray-200 mx-1 hidden sm:block" aria-hidden="true"></div>
+                        <span class="text-sm text-gray-700 font-medium hidden sm:block">{{.username}}</span>
+                        <button onclick="logout()" class="px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-lg transition-colors focus-ring" aria-label="退出登录">退出</button>
+                    </div>
                 </div>
             </div>
-        </div>
-    </nav>
+        </nav>
 
-    <!-- 主内容区 -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <!-- 消息提示 -->
-        <div id="message" class="hidden mb-4 p-3 rounded-md"></div>
+        <!-- 主内容区 -->
+        <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+            <!-- 页面标题 -->
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
+                <div>
+                    <h2 class="text-2xl sm:text-3xl font-extrabold text-gray-900">我的分享 📤</h2>
+                    <p class="mt-1 text-gray-500 font-medium">管理你分享的文件和文件夹链接</p>
+                </div>
+                <a href="/files" class="inline-flex items-center justify-center px-5 py-2.5 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all btn-bounce focus-ring">
+                    <svg class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    创建新分享
+                </a>
+            </div>
 
-        <!-- 分享列表 -->
-        <div class="bg-white rounded-lg shadow">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">项目名称</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">文件/文件夹</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">密码保护</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">有效期至</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200" id="share-list">
-                    <!-- 动态加载 -->
-                </tbody>
-            </table>
-        </div>
+            <!-- 消息提示 -->
+            <div id="message" class="hidden mb-6 p-4 rounded-xl font-semibold" role="alert" aria-live="polite"></div>
 
-        <!-- 空状态 -->
-        <div id="empty-state" class="hidden text-center py-12">
-            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-900">暂无分享</h3>
-            <p class="mt-1 text-sm text-gray-500">去文件管理中分享文件或文件夹吧</p>
-            <div class="mt-6">
-                <a href="/files" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+            <!-- 加载中 -->
+            <div id="loading-state" class="text-center py-20">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white shadow-lg mb-4 border-2 border-gray-100">
+                    <svg class="w-8 h-8 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
+                <p class="text-gray-600 font-semibold">加载中…</p>
+            </div>
+
+            <!-- 分享列表容器 -->
+            <div id="shares-container" class="hidden">
+                <!-- 桌面端表格 -->
+                <div class="hidden md:block bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
+                    <table class="min-w-full">
+                        <thead>
+                            <tr class="bg-gray-50 border-b-2 border-gray-100">
+                                <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wide">分享项目</th>
+                                <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wide">类型</th>
+                                <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wide">状态</th>
+                                <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wide">有效期</th>
+                                <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wide">创建时间</th>
+                                <th scope="col" class="px-6 py-4 text-right text-xs font-bold text-gray-600 uppercase tracking-wide">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100" id="share-list">
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 移动端卡片 -->
+                <div class="md:hidden space-y-4" id="share-cards"></div>
+            </div>
+
+            <!-- 空状态 -->
+            <div id="empty-state" class="hidden text-center py-20">
+                <div class="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-100 to-purple-100 mb-6 shadow-lg">
+                    <svg class="w-12 h-12 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-extrabold text-gray-900 mb-2">还没有分享内容</h3>
+                <p class="text-gray-500 font-medium mb-6 max-w-sm mx-auto">分享你的文件或文件夹，生成链接与朋友共享</p>
+                <a href="/files" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all btn-bounce focus-ring">
+                    <svg class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                    </svg>
                     前往文件管理
                 </a>
             </div>
+        </main>
+
+        <!-- 底部 -->
+        <footer class="py-6 text-center border-t border-gray-200 bg-white">
+            <p class="text-sm text-gray-500 font-medium">NDisk · 安全便捷的文件分享服务</p>
+        </footer>
+    </div>
+
+    <!-- 删除确认模态框 -->
+    <div id="delete-modal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm" aria-hidden="true"></div>
+        <div class="fixed inset-0 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md border-2 border-gray-100 overflow-hidden">
+                    <div class="p-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100">
+                                <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900" id="modal-title">确认删除分享</h3>
+                                <p class="mt-2 text-sm text-gray-600">删除后他人将无法通过该链接访问，此操作不可撤销。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-100">
+                        <button type="button" id="cancel-delete-btn" class="px-4 py-2.5 text-sm font-bold text-gray-700 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-colors focus-ring">
+                            取消
+                        </button>
+                        <button type="button" id="confirm-delete-btn" class="px-4 py-2.5 text-sm font-bold text-white bg-red-500 rounded-xl hover:bg-red-600 transition-colors focus-ring">
+                            确认删除
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
-    </main>
-</div>
+    </div>
 
-<!-- 加载中提示 -->
-<div id="loading-state" class="text-center py-12">
-    <p class="text-gray-500">加载中...</p>
-</div>
-
-<script>
-    // 页面加载时获取分享列表
-    document.addEventListener('DOMContentLoaded', function() {
-        loadShares();
-    });
-
-    function loadShares() {
-        authFetch('/api/shares').then(function(response) {
-            return response.json();
-        }).then(function(data) {
-            document.getElementById('loading-state').classList.add('hidden');
-            if (data.shares && data.shares.length > 0) {
-                renderShares(data.shares);
-            } else {
-                document.getElementById('empty-state').classList.remove('hidden');
-            }
-        }).catch(function(err) {
-            document.getElementById('loading-state').classList.add('hidden');
-            showMessage('加载分享列表失败', true);
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            loadShares();
         });
-    }
 
-    function renderShares(shares) {
-        var tbody = document.getElementById('share-list');
-        tbody.innerHTML = '';
+        function loadShares() {
+            authFetch('/api/shares').then(function(response) {
+                return response.json();
+            }).then(function(data) {
+                document.getElementById('loading-state').classList.add('hidden');
 
-        shares.forEach(function(s) {
-            var tr = document.createElement('tr');
-            tr.className = 'hover:bg-gray-50';
-            tr.id = 'share-row-' + s.id;
-
-            // 项目名称
-            var tdName = document.createElement('td');
-            tdName.className = 'px-6 py-4 whitespace-nowrap';
-            tdName.innerHTML = '<span class="text-gray-900 font-medium">' + escapeHtml(s.project_name) + '</span>';
-            tr.appendChild(tdName);
-
-            // 文件/文件夹名
-            var tdItem = document.createElement('td');
-            tdItem.className = 'px-6 py-4 whitespace-nowrap';
-            var itemIcon = s.is_folder
-                ? '<svg class="h-5 w-5 text-yellow-500 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>'
-                : '<svg class="h-5 w-5 text-gray-400 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/></svg>';
-            tdItem.innerHTML = itemIcon + '<span class="text-gray-700">' + escapeHtml(s.item_name) + '</span>';
-            tr.appendChild(tdItem);
-
-            // 类型
-            var tdType = document.createElement('td');
-            tdType.className = 'px-6 py-4 whitespace-nowrap';
-            tdType.innerHTML = s.is_folder
-                ? '<span class="px-2 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-800">文件夹</span>'
-                : '<span class="px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">文件</span>';
-            tr.appendChild(tdType);
-
-            // 密码保护
-            var tdPwd = document.createElement('td');
-            tdPwd.className = 'px-6 py-4 whitespace-nowrap';
-            tdPwd.innerHTML = s.has_password
-                ? '<span class="text-green-600 text-sm">是</span>'
-                : '<span class="text-gray-400 text-sm">否</span>';
-            tr.appendChild(tdPwd);
-
-            // 有效期
-            var tdExpires = document.createElement('td');
-            tdExpires.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-500';
-            tdExpires.textContent = s.expires_at || '永久';
-            tr.appendChild(tdExpires);
-
-            // 创建时间
-            var tdCreated = document.createElement('td');
-            tdCreated.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-500';
-            tdCreated.textContent = s.created_at;
-            tr.appendChild(tdCreated);
-
-            // 操作
-            var tdActions = document.createElement('td');
-            tdActions.className = 'px-6 py-4 whitespace-nowrap';
-            tdActions.innerHTML = '<div class="flex items-center space-x-3">'
-                + '<button onclick="copyMyShareLink(\'' + s.share_token + '\')" class="text-blue-600 hover:text-blue-800 text-sm">复制链接</button>'
-                + '<button onclick="deleteShare(' + s.id + ')" class="text-red-600 hover:text-red-800 text-sm">删除</button>'
-                + '</div>';
-            tr.appendChild(tdActions);
-
-            tbody.appendChild(tr);
-        });
-    }
-
-    function escapeHtml(text) {
-        var div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    function copyMyShareLink(token) {
-        var link = window.location.origin + '/s/' + token;
-        navigator.clipboard.writeText(link).then(function() {
-            showMessage('链接已复制到剪贴板');
-        }).catch(function() {
-            // 降级方案
-            var input = document.createElement('input');
-            input.value = link;
-            document.body.appendChild(input);
-            input.select();
-            document.execCommand('copy');
-            document.body.removeChild(input);
-            showMessage('链接已复制到剪贴板');
-        });
-    }
-
-    function deleteShare(id) {
-        if (!confirm('确定要删除此分享吗？删除后他人将无法通过该链接访问。')) return;
-
-        authFetch('/api/shares/' + id, { method: 'DELETE' }).then(function(response) {
-            return response.json();
-        }).then(function(data) {
-            if (data.message) {
-                showMessage('分享已删除');
-                // 移除对应行
-                var row = document.getElementById('share-row-' + id);
-                if (row) row.remove();
-                // 检查是否为空
-                var tbody = document.getElementById('share-list');
-                if (tbody.children.length === 0) {
+                if (data.shares && data.shares.length > 0) {
+                    document.getElementById('shares-container').classList.remove('hidden');
+                    renderShares(data.shares);
+                } else {
                     document.getElementById('empty-state').classList.remove('hidden');
                 }
-            } else {
-                showMessage(data.error || '删除失败', true);
+            }).catch(function(err) {
+                document.getElementById('loading-state').classList.add('hidden');
+                showMessage('加载分享列表失败，请刷新重试', 'error');
+            });
+        }
+
+        function renderShares(shares) {
+            var tbody = document.getElementById('share-list');
+            var cardsContainer = document.getElementById('share-cards');
+            tbody.innerHTML = '';
+            cardsContainer.innerHTML = '';
+
+            shares.forEach(function(s, index) {
+                // 桌面端行
+                var tr = document.createElement('tr');
+                tr.className = 'row-hover fade-in';
+                tr.id = 'share-row-' + s.id;
+                tr.style.animationDelay = (index * 0.05) + 's';
+
+                var folderIcon = s.is_folder
+                    ? '<svg class="w-5 h-5 text-amber-500" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>'
+                    : '<svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/></svg>';
+
+                tr.innerHTML = '<td class="px-6 py-4">'
+                    + '<div class="flex items-center gap-3">'
+                    + '<div class="w-10 h-10 rounded-xl ' + (s.is_folder ? 'bg-amber-100' : 'bg-blue-100') + ' flex items-center justify-center">' + folderIcon + '</div>'
+                    + '<div class="min-w-0">'
+                    + '<div class="font-bold text-gray-900 truncate">' + escapeHtml(s.project_name) + '</div>'
+                    + '<div class="text-sm text-gray-500 truncate">' + escapeHtml(s.item_name) + '</div>'
+                    + '</div>'
+                    + '</div>'
+                    + '</td>'
+                    + '<td class="px-6 py-4">'
+                    + (s.is_folder
+                        ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-700">📁 文件夹</span>'
+                        : '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-100 text-blue-700">📄 文件</span>')
+                    + '</td>'
+                    + '<td class="px-6 py-4">'
+                    + (s.has_password
+                        ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-700">🔒 密码保护</span>'
+                        : '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-100 text-gray-600">🌐 公开</span>')
+                    + '</td>'
+                    + '<td class="px-6 py-4 text-sm font-semibold text-gray-700">' + (s.expires_at ? formatDateTime(s.expires_at) : '<span class="text-green-600">永久有效</span>') + '</td>'
+                    + '<td class="px-6 py-4 text-sm text-gray-500">' + formatDateTime(s.created_at) + '</td>'
+                    + '<td class="px-6 py-4">'
+                    + '<div class="flex items-center justify-end gap-2">'
+                    + '<button onclick="copyMyShareLink(\'' + s.share_token + '\')" class="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors focus-ring" aria-label="复制分享链接">'
+                    + '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>'
+                    + '</button>'
+                    + '<button onclick="showDeleteModal(' + s.id + ')" class="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors focus-ring" aria-label="删除分享">'
+                    + '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>'
+                    + '</button>'
+                    + '</div>'
+                    + '</td>';
+
+                tbody.appendChild(tr);
+
+                // 移动端卡片
+                var card = document.createElement('div');
+                card.className = 'bg-white rounded-2xl shadow-lg border-2 border-gray-100 p-5 card-hover fade-in';
+                card.style.animationDelay = (index * 0.05) + 's';
+
+                card.innerHTML = '<div class="flex items-start justify-between gap-3">'
+                    + '<div class="flex items-start gap-3 min-w-0">'
+                    + '<div class="w-12 h-12 rounded-xl ' + (s.is_folder ? 'bg-amber-100' : 'bg-blue-100') + ' flex items-center justify-center shrink-0">'
+                    + (s.is_folder ? '<svg class="w-6 h-6 text-amber-600" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>' : '<svg class="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/></svg>')
+                    + '</div>'
+                    + '<div class="min-w-0">'
+                    + '<div class="font-bold text-gray-900 truncate">' + escapeHtml(s.project_name) + '</div>'
+                    + '<div class="text-sm text-gray-500 truncate">' + escapeHtml(s.item_name) + '</div>'
+                    + '<div class="flex flex-wrap items-center gap-2 mt-2">'
+                    + (s.has_password
+                        ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-green-100 text-green-700">🔒 密码</span>'
+                        : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-gray-100 text-gray-600">🌐 公开</span>')
+                    + '<span class="text-xs text-gray-400">' + (s.expires_at ? formatDateTime(s.expires_at) : '永久') + '</span>'
+                    + '</div>'
+                    + '</div>'
+                    + '</div>'
+                    + '<div class="flex gap-1 shrink-0">'
+                    + '<button onclick="copyMyShareLink(\'' + s.share_token + '\')" class="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors focus-ring" aria-label="复制链接">'
+                    + '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>'
+                    + '</button>'
+                    + '<button onclick="showDeleteModal(' + s.id + ')" class="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors focus-ring" aria-label="删除">'
+                    + '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>'
+                    + '</button>'
+                    + '</div>'
+                    + '</div>';
+
+                cardsContainer.appendChild(card);
+            });
+        }
+
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatDateTime(dateString) {
+            if (!dateString) return '';
+            try {
+                var date = new Date(dateString);
+                return new Intl.DateTimeFormat('zh-CN', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }).format(date);
+            } catch (e) {
+                return dateString;
             }
-        }).catch(function() {
-            showMessage('网络错误，请重试', true);
+        }
+
+        function copyMyShareLink(token) {
+            var link = window.location.origin + '/s/' + token;
+            navigator.clipboard.writeText(link).then(function() {
+                showMessage('链接已复制到剪贴板 ✓', 'success');
+            }).catch(function() {
+                var input = document.createElement('input');
+                input.value = link;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                showMessage('链接已复制到剪贴板 ✓', 'success');
+            });
+        }
+
+        var deleteShareId = null;
+
+        function showDeleteModal(id) {
+            deleteShareId = id;
+            document.getElementById('delete-modal').classList.remove('hidden');
+            document.getElementById('cancel-delete-btn').focus();
+        }
+
+        function hideDeleteModal() {
+            deleteShareId = null;
+            document.getElementById('delete-modal').classList.add('hidden');
+        }
+
+        document.getElementById('cancel-delete-btn').addEventListener('click', hideDeleteModal);
+        document.getElementById('confirm-delete-btn').addEventListener('click', function() {
+            if (deleteShareId) {
+                deleteShare(deleteShareId);
+                hideDeleteModal();
+            }
         });
-    }
-</script>
+
+        document.getElementById('delete-modal').addEventListener('click', function(e) {
+            if (e.target === this || e.target === this.firstElementChild) {
+                hideDeleteModal();
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !document.getElementById('delete-modal').classList.contains('hidden')) {
+                hideDeleteModal();
+            }
+        });
+
+        function deleteShare(id) {
+            authFetch('/api/shares/' + id, { method: 'DELETE' }).then(function(response) {
+                return response.json();
+            }).then(function(data) {
+                if (data.message) {
+                    showMessage('分享已成功删除', 'success');
+                    var row = document.getElementById('share-row-' + id);
+                    if (row) row.remove();
+
+                    var tbody = document.getElementById('share-list');
+                    if (tbody.children.length === 0) {
+                        document.getElementById('shares-container').classList.add('hidden');
+                        document.getElementById('empty-state').classList.remove('hidden');
+                    }
+                } else {
+                    showMessage(data.error || '删除失败，请重试', 'error');
+                }
+            }).catch(function() {
+                showMessage('网络错误，请检查连接后重试', 'error');
+            });
+        }
+
+        function showMessage(text, type) {
+            var el = document.getElementById('message');
+            el.textContent = text;
+            el.className = 'mb-6 p-4 rounded-xl font-semibold';
+
+            if (type === 'success') {
+                el.classList.add('bg-green-100', 'text-green-800', 'border-2', 'border-green-200');
+            } else if (type === 'error') {
+                el.classList.add('bg-red-100', 'text-red-800', 'border-2', 'border-red-200');
+            } else {
+                el.classList.add('bg-blue-100', 'text-blue-800', 'border-2', 'border-blue-200');
+            }
+
+            el.classList.remove('hidden');
+
+            setTimeout(function() {
+                el.classList.add('hidden');
+            }, 3000);
+        }
+    </script>
 </body>
 </html>
 {{end}}

@@ -4,8 +4,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#ffffff">
     <title>文件管理 - NDisk</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['Nunito', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        },
+                        cute: {
+                            pink: '#ec4899',
+                            purple: '#8b5cf6',
+                            mint: '#10b981',
+                            orange: '#f59e0b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -14,6 +44,80 @@
     <script>window.__ACCESS_TOKEN__ = "{{.accessToken}}";</script>
     <script src="/static/js/app.js"></script>
     <style>
+        @media (prefers-reduced-motion: reduce) {
+            *, ::before, ::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        * { font-family: 'Nunito', sans-serif; }
+
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-bounce {
+            transition: transform 0.15s ease, box-shadow 0.2s ease;
+        }
+        .btn-bounce:hover {
+            transform: scale(1.02);
+        }
+        .btn-bounce:active {
+            transform: scale(0.98);
+        }
+
+        .focus-ring:focus-visible {
+            outline: 3px solid #3b82f6;
+            outline-offset: 2px;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.4s ease forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .row-hover {
+            transition: background-color 0.15s ease;
+        }
+        .row-hover:hover {
+            background-color: #f8fafc;
+        }
+
+        .dot-pattern {
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* 下拉菜单 */
+        .dropdown-menu {
+            position: fixed;
+            opacity: 0;
+            transform: translateY(-4px) scale(0.95);
+            pointer-events: none;
+            transition: opacity 0.15s ease, transform 0.15s ease;
+        }
+        .dropdown-menu.open {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        .dropdown-item {
+            transition: background-color 0.1s ease, padding-left 0.15s ease;
+        }
+        .dropdown-item:hover {
+            background-color: #f1f5f9;
+            padding-left: 1.25rem;
+        }
+
         /* 上传进度水波球 */
         #upload-progress-ball {
             position: fixed;
@@ -25,7 +129,6 @@
             pointer-events: none;
             transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-
         #upload-progress-ball.visible {
             opacity: 1;
             transform: scale(1);
@@ -38,367 +141,645 @@
             border-radius: 50%;
             position: relative;
             overflow: hidden;
-            background: #dfe9f7;
+            background: #dbeafe;
             box-shadow:
-                0 6px 20px rgba(41, 104, 178, 0.3),
+                0 6px 20px rgba(59, 130, 246, 0.3),
                 0 0 0 3px rgba(255, 255, 255, 0.7);
         }
-
         .progress-ball .water {
             position: absolute;
             bottom: 0;
             left: 0;
             width: 100%;
             height: 0%;
-            background: linear-gradient(180deg, #5ca0e8 0%, #2670c4 100%);
+            background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%);
             transition: height 0.3s ease-out;
         }
-
         .progress-ball .water .wave1,
         .progress-ball .water .wave2 {
             position: absolute;
             width: 300%;
             height: 24px;
         }
-
         .progress-ball .water .wave1 {
             top: -12px;
             left: -120%;
             border-radius: 42%;
-            background: rgba(255, 255, 255, 0.25);
+            background: rgba(255, 255, 255, 0.3);
             animation: wave-motion 2.8s ease-in-out infinite;
         }
-
         .progress-ball .water .wave2 {
             top: -8px;
             left: -80%;
             height: 20px;
             border-radius: 38%;
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.2);
             animation: wave-motion 3.5s ease-in-out infinite reverse;
         }
-
         @keyframes wave-motion {
             0%, 100% { transform: translateX(0) rotate(0deg); }
             50% { transform: translateX(25%) rotate(2deg); }
         }
-
         .progress-ball .percent-text {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             font-size: 1.15rem;
-            font-weight: 700;
+            font-weight: 800;
             z-index: 10;
-            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
             pointer-events: none;
             user-select: none;
-            transition: color 0.3s ease;
+            color: #1e40af;
         }
-
-        /* 上传中脉冲光效 */
         #upload-progress-ball.visible .progress-ball::after {
             content: '';
             position: absolute;
             inset: -3px;
             border-radius: 50%;
-            border: 2px solid rgba(74, 144, 226, 0.4);
+            border: 2px solid rgba(59, 130, 246, 0.4);
             animation: pulse-ring 1.5s ease-out infinite;
         }
-
         @keyframes pulse-ring {
             0% { transform: scale(1); opacity: 1; }
             100% { transform: scale(1.25); opacity: 0; }
         }
+
+        /* 模态框动画 */
+        .modal-backdrop {
+            transition: opacity 0.2s ease;
+        }
+        .modal-panel {
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        /* 文件图标 */
+        .file-icon { transition: transform 0.2s ease; }
+        .row-hover:hover .file-icon { transform: scale(1.1); }
+
+        /* 面包屑 */
+        .breadcrumb-item {
+            transition: color 0.15s ease;
+        }
+        .breadcrumb-item:hover {
+            color: #3b82f6;
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-<div class="min-h-screen">
-    <!-- 顶部导航 -->
-    <nav class="bg-white shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <h1 class="text-xl font-bold text-gray-800">NDisk 文件管理</h1>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <a href="/files" class="text-blue-600 hover:text-blue-800 font-medium">文件管理</a>
-                    <a href="/share" class="text-gray-600 hover:text-blue-600 font-medium">我的分享</a>
-                    <a href="/nfs" class="text-gray-600 hover:text-blue-600 font-medium">NFS 挂载</a>
-                    <span class="text-gray-400">|</span>
-                    <span class="text-gray-600">欢迎，{{.username}}</span>
-                    <button onclick="logout()" class="text-red-600 hover:text-red-800">退出登录</button>
+<body class="bg-gray-50 min-h-screen">
+    <div class="min-h-screen flex flex-col">
+        <!-- 轻微装饰背景 -->
+        <div class="fixed inset-0 dot-pattern pointer-events-none -z-10 opacity-50"></div>
+
+        <!-- 顶部导航 -->
+        <nav class="bg-white border-b-2 border-gray-100 sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16 items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center shadow-md">
+                            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                            </svg>
+                        </div>
+                        <h1 class="text-xl font-extrabold text-gray-900">NDisk</h1>
+                        <span class="hidden sm:inline-block px-2.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">文件管理</span>
+                    </div>
+                    <div class="flex items-center gap-1 sm:gap-2">
+                        <a href="/files" class="px-3 py-2 text-sm font-bold text-blue-600 bg-blue-50 rounded-lg focus-ring" aria-current="page">文件管理</a>
+                        <a href="/share" class="px-3 py-2 text-sm font-semibold text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-ring">我的分享</a>
+                        <a href="/nfs" class="px-3 py-2 text-sm font-semibold text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-ring">NFS</a>
+                        <div class="w-px h-6 bg-gray-200 mx-1 hidden sm:block" aria-hidden="true"></div>
+                        <span class="text-sm text-gray-700 font-medium hidden sm:block">{{.username}}</span>
+                        <button onclick="logout()" class="px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-lg transition-colors focus-ring" aria-label="退出登录">退出</button>
+                    </div>
                 </div>
             </div>
-        </div>
-    </nav>
+        </nav>
 
-    <!-- 主内容区 -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <!-- 面包屑导航 -->
-        <div class="mb-4 flex items-center text-sm text-gray-600">
-            <a href="/files" class="hover:text-blue-600">
-                <svg class="h-4 w-4 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
+        <!-- 主内容区 -->
+        <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+            <!-- 页面标题和操作 -->
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+                <div>
+                    <h2 class="text-2xl sm:text-3xl font-extrabold text-gray-900">文件管理 📁</h2>
+                    <p class="mt-1 text-gray-500 font-medium">上传、管理和组织你的文件</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <!-- 上传按钮 -->
+                    <form id="upload-form" class="flex items-center">
+                        <input type="file" id="file-input" name="file" class="hidden">
+                        <button type="button" onclick="document.getElementById('file-input').click()"
+                            class="inline-flex items-center justify-center px-5 py-2.5 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all btn-bounce focus-ring">
+                            <svg class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                            </svg>
+                            上传文件
+                        </button>
+                        {{if .parentID}}
+                        <input type="hidden" name="parent_id" value="{{.parentID}}">
+                        {{end}}
+                    </form>
+                    <!-- 新建文件夹按钮 -->
+                    <button onclick="showCreateFolderModal()"
+                        class="inline-flex items-center justify-center px-5 py-2.5 bg-white text-gray-700 font-bold rounded-xl shadow-lg border-2 border-gray-200 hover:border-green-300 hover:bg-green-50 hover:text-green-700 transition-all btn-bounce focus-ring">
+                        <svg class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                        </svg>
+                        新建文件夹
+                    </button>
+                </div>
+            </div>
+
+            <!-- 面包屑导航 -->
+            <div class="mb-6 flex items-center flex-wrap gap-1 text-sm bg-white rounded-xl px-4 py-3 shadow border-2 border-gray-100">
+                <a href="/files" class="breadcrumb-item inline-flex items-center gap-1.5 font-semibold text-gray-700 hover:text-blue-600 focus-ring rounded px-1">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    </svg>
+                    根目录
+                </a>
+                {{range .breadcrumb}}
+                <svg class="w-4 h-4 text-gray-300 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
                 </svg>
-                根目录
-            </a>
-            {{range .breadcrumb}}
-            <svg class="h-4 w-4 mx-2 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
-            </svg>
-            <a href="/files?parent_id={{.ID}}" class="hover:text-blue-600">{{.Name}}</a>
-            {{end}}
-        </div>
-
-        <!-- 操作栏 -->
-        <div class="mb-6 flex flex-wrap gap-4">
-            <!-- 上传文件 -->
-            <form id="upload-form" class="flex items-center gap-2">
-                <input type="file" id="file-input" name="file" class="hidden">
-                <button type="button" onclick="document.getElementById('file-input').click()"
-                    class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
-                    上传文件
-                </button>
-                {{if .parentID}}
-                <input type="hidden" name="parent_id" value="{{.parentID}}">
+                <a href="/files?parent_id={{.ID}}" class="breadcrumb-item font-semibold text-gray-700 hover:text-blue-600 focus-ring rounded px-1">{{.Name}}</a>
                 {{end}}
-            </form>
+            </div>
 
-            <!-- 创建文件夹 -->
-            <button onclick="showCreateFolderModal()"
-                class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors">
-                新建文件夹
-            </button>
+            <!-- 消息提示 -->
+            <div id="message" class="hidden mb-6 p-4 rounded-xl font-semibold" role="alert" aria-live="polite"></div>
 
-        </div>
-
-        <!-- 消息提示 -->
-        <div id="message" class="hidden mb-4 p-3 rounded-md"></div>
-
-        <!-- 文件列表 -->
-        <div class="bg-white rounded-lg shadow">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">名称</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">大小</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200" id="file-list">
-                    <!-- 文件夹列表 -->
-                    {{range .folders}}
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center">
-                                <svg class="h-5 w-5 text-yellow-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-                                </svg>
-                                <a href="/files?parent_id={{.ID}}" class="text-blue-600 hover:underline">{{.Name}}</a>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-gray-500">-</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="relative inline-block text-left">
-                                <button onclick="toggleDropdown('dropdown-{{.ID}}')" class="text-gray-600 hover:text-gray-800">
-                                    ⁝
-                                </button>
-                                <div id="dropdown-{{.ID}}" class="hidden absolute right-0 mt-2 w-32 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-                                    <div class="py-1">
-                                        <a href="#" onclick="downloadFolder({{.ID}}); return false;" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">下载</a>
-                                        <a href="#" data-id="{{.ID}}" data-name="{{.Name}}" onclick="showRenameModalFromLink(this); return false;" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">重命名</a>
-                                        <a href="#" data-id="{{.ID}}" onclick="showMoveModal(this); return false;" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">移动</a>
-                                        <a href="#" data-id="{{.ID}}" data-name="{{.Name}}" data-type="folder" onclick="showShareModal(this); return false;" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">分享</a>
-                                        <a href="#" onclick="deleteItem({{.ID}}, true); return false;" class="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">删除</a>
+            <!-- 文件列表 -->
+            <div class="bg-white rounded-2xl shadow-lg border-2 border-gray-100">
+                <!-- 桌面端表格 -->
+                <div class="hidden md:block">
+                    <table class="min-w-full">
+                        <thead>
+                            <tr class="bg-gray-50 border-b-2 border-gray-100">
+                                <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wide">名称</th>
+                                <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wide">大小</th>
+                                <th scope="col" class="px-6 py-4 text-right text-xs font-bold text-gray-600 uppercase tracking-wide">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <!-- 文件夹列表 -->
+                            {{range .folders}}
+                            <tr class="row-hover">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="file-icon w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                                            <svg class="w-5 h-5 text-amber-600" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                                            </svg>
+                                        </div>
+                                        <a href="/files?parent_id={{.ID}}" class="font-bold text-gray-900 hover:text-blue-600 transition-colors">{{.Name}}</a>
                                     </div>
+                                </td>
+                                <td class="px-6 py-4 text-sm font-semibold text-gray-400">-</td>
+                                <td class="px-6 py-4">
+                                    <div class="relative flex justify-end">
+                                        <button onclick="toggleDropdown('dropdown-{{.ID}}')" class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors focus-ring" aria-label="更多操作" aria-expanded="false">
+                                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
+                                            </svg>
+                                        </button>
+                                        <div id="dropdown-{{.ID}}" class="dropdown-menu w-40 rounded-xl shadow-lg bg-white border-2 border-gray-100 z-50 overflow-hidden">
+                                            <div class="py-1">
+                                                <a href="#" onclick="downloadFolder({{.ID}}); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">
+                                                    <svg class="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                                    下载
+                                                </a>
+                                                <a href="#" data-id="{{.ID}}" data-name="{{.Name}}" onclick="showRenameModalFromLink(this); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">
+                                                    <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                                    重命名
+                                                </a>
+                                                <a href="#" data-id="{{.ID}}" onclick="showMoveModal(this); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">
+                                                    <svg class="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                                    移动
+                                                </a>
+                                                <a href="#" data-id="{{.ID}}" data-name="{{.Name}}" data-type="folder" onclick="showShareModal(this); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">
+                                                    <svg class="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                                                    分享
+                                                </a>
+                                                <div class="border-t border-gray-100 my-1" aria-hidden="true"></div>
+                                                <a href="#" onclick="deleteItem({{.ID}}, true); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-red-600">
+                                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                                    删除
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {{end}}
+
+                            <!-- 文件列表 -->
+                            {{range .files}}
+                            <tr class="row-hover">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="file-icon w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                                            <svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                                <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/>
+                                            </svg>
+                                        </div>
+                                        <span class="font-bold text-gray-900">{{.Name}}</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-sm font-semibold text-gray-500">{{.Size}} bytes</td>
+                                <td class="px-6 py-4">
+                                    <div class="relative flex justify-end">
+                                        <button onclick="toggleDropdown('dropdown-file-{{.ID}}')" class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors focus-ring" aria-label="更多操作" aria-expanded="false">
+                                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
+                                            </svg>
+                                        </button>
+                                        <div id="dropdown-file-{{.ID}}" class="dropdown-menu w-40 rounded-xl shadow-lg bg-white border-2 border-gray-100 z-50 overflow-hidden">
+                                            <div class="py-1">
+                                                <a href="#" data-id="{{.ID}}" data-name="{{.Name}}" data-size="{{.Size}}" onclick="previewFile(this); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">
+                                                    <svg class="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                                    预览
+                                                </a>
+                                                <a href="#" onclick="downloadFile({{.ID}}); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">
+                                                    <svg class="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                                    下载
+                                                </a>
+                                                <a href="#" data-id="{{.ID}}" data-name="{{.Name}}" onclick="showRenameModalFromLink(this); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">
+                                                    <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                                    重命名
+                                                </a>
+                                                <a href="#" data-id="{{.ID}}" onclick="showMoveModal(this); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">
+                                                    <svg class="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                                    移动
+                                                </a>
+                                                <a href="#" data-id="{{.ID}}" data-name="{{.Name}}" data-type="file" onclick="showShareModal(this); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">
+                                                    <svg class="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                                                    分享
+                                                </a>
+                                                <div class="border-t border-gray-100 my-1" aria-hidden="true"></div>
+                                                <a href="#" onclick="deleteItem({{.ID}}, false); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-red-600">
+                                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                                    删除
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {{end}}
+
+                            <!-- 空状态 -->
+                            {{if and (not .folders) (not .files)}}
+                            <tr>
+                                <td colspan="3" class="px-6 py-16 text-center">
+                                    <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-100 to-purple-100 mb-4">
+                                        <svg class="w-10 h-10 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                                        </svg>
+                                    </div>
+                                    <p class="text-lg font-bold text-gray-700 mb-1">此文件夹为空</p>
+                                    <p class="text-sm text-gray-500">上传文件或创建新文件夹开始使用</p>
+                                </td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 移动端卡片视图 -->
+                <div class="md:hidden divide-y divide-gray-100">
+                    {{range .folders}}
+                    <div class="p-4 row-hover">
+                        <div class="flex items-center justify-between">
+                            <a href="/files?parent_id={{.ID}}" class="flex items-center gap-3 min-w-0 flex-1">
+                                <div class="file-icon w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                                    <svg class="w-6 h-6 text-amber-600" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                                    </svg>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="font-bold text-gray-900 truncate">{{.Name}}</div>
+                                    <div class="text-xs text-gray-400 mt-0.5">文件夹</div>
+                                </div>
+                            </a>
+                            <button onclick="toggleDropdown('dropdown-m-{{.ID}}')" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg shrink-0 focus-ring" aria-label="更多操作">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/></svg>
+                            </button>
+                            <div id="dropdown-m-{{.ID}}" class="dropdown-menu w-40 rounded-xl shadow-lg bg-white border-2 border-gray-100 z-50 overflow-hidden">
+                                <div class="py-1">
+                                    <a href="#" onclick="downloadFolder({{.ID}}); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">📥 下载</a>
+                                    <a href="#" data-id="{{.ID}}" data-name="{{.Name}}" onclick="showRenameModalFromLink(this); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">✏️ 重命名</a>
+                                    <a href="#" data-id="{{.ID}}" onclick="showMoveModal(this); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">📦 移动</a>
+                                    <a href="#" data-id="{{.ID}}" data-name="{{.Name}}" data-type="folder" onclick="showShareModal(this); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">🔗 分享</a>
+                                    <div class="border-t border-gray-100 my-1"></div>
+                                    <a href="#" onclick="deleteItem({{.ID}}, true); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-red-600">🗑️ 删除</a>
                                 </div>
                             </div>
-                        </td>
-                    </tr>
+                        </div>
+                    </div>
                     {{end}}
 
-                    <!-- 文件列表 -->
                     {{range .files}}
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center">
-                                <svg class="h-5 w-5 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/>
-                                </svg>
-                                <span class="text-gray-900">{{.Name}}</span>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{.Size}} bytes</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="relative inline-block text-left">
-                                <button onclick="toggleDropdown('dropdown-file-{{.ID}}')" class="text-gray-600 hover:text-gray-800">
-                                    ⁝
-                                </button>
-                                <div id="dropdown-file-{{.ID}}" class="hidden absolute right-0 mt-2 w-32 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-                                    <div class="py-1">
-                                        <a href="#" data-id="{{.ID}}" data-name="{{.Name}}" data-size="{{.Size}}" onclick="previewFile(this); return false;" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">预览</a>
-                                        <a href="#" onclick="downloadFile({{.ID}}); return false;" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">下载</a>
-                                        <a href="#" data-id="{{.ID}}" data-name="{{.Name}}" onclick="showRenameModalFromLink(this); return false;" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">重命名</a>
-                                        <a href="#" data-id="{{.ID}}" onclick="showMoveModal(this); return false;" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">移动</a>
-                                        <a href="#" data-id="{{.ID}}" data-name="{{.Name}}" data-type="file" onclick="showShareModal(this); return false;" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">分享</a>
-                                        <a href="#" onclick="deleteItem({{.ID}}, false); return false;" class="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">删除</a>
-                                    </div>
+                    <div class="p-4 row-hover">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3 min-w-0 flex-1">
+                                <div class="file-icon w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                                    <svg class="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/>
+                                    </svg>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="font-bold text-gray-900 truncate">{{.Name}}</div>
+                                    <div class="text-xs text-gray-400 mt-0.5">{{.Size}} bytes</div>
                                 </div>
                             </div>
-                        </td>
-                    </tr>
+                            <button onclick="toggleDropdown('dropdown-mf-{{.ID}}')" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg shrink-0 focus-ring" aria-label="更多操作">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/></svg>
+                            </button>
+                            <div id="dropdown-mf-{{.ID}}" class="dropdown-menu w-40 rounded-xl shadow-lg bg-white border-2 border-gray-100 z-50 overflow-hidden">
+                                <div class="py-1">
+                                    <a href="#" data-id="{{.ID}}" data-name="{{.Name}}" data-size="{{.Size}}" onclick="previewFile(this); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">👁️ 预览</a>
+                                    <a href="#" onclick="downloadFile({{.ID}}); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">📥 下载</a>
+                                    <a href="#" data-id="{{.ID}}" data-name="{{.Name}}" onclick="showRenameModalFromLink(this); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">✏️ 重命名</a>
+                                    <a href="#" data-id="{{.ID}}" onclick="showMoveModal(this); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">📦 移动</a>
+                                    <a href="#" data-id="{{.ID}}" data-name="{{.Name}}" data-type="file" onclick="showShareModal(this); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-gray-700">🔗 分享</a>
+                                    <div class="border-t border-gray-100 my-1"></div>
+                                    <a href="#" onclick="deleteItem({{.ID}}, false); return false;" class="dropdown-item flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-red-600">🗑️ 删除</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     {{end}}
 
                     {{if and (not .folders) (not .files)}}
-                    <tr>
-                        <td colspan="3" class="px-6 py-4 text-center text-gray-500">暂无文件</td>
-                    </tr>
+                    <div class="p-8 text-center">
+                        <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-100 to-purple-100 mb-4">
+                            <svg class="w-10 h-10 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                            </svg>
+                        </div>
+                        <p class="text-lg font-bold text-gray-700 mb-1">此文件夹为空</p>
+                        <p class="text-sm text-gray-500">上传文件或创建新文件夹</p>
+                    </div>
                     {{end}}
-                </tbody>
-            </table>
-        </div>
-    </main>
-</div>
-
-<!-- 创建文件夹模态框 -->
-<div id="create-folder-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-md p-6 w-full max-w-md">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">新建文件夹</h3>
-        <form id="create-folder-form">
-            <input type="text" id="folder-name" name="name" required placeholder="文件夹名称"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
-            {{if .parentID}}
-            <input type="hidden" name="parent_id" value="{{.parentID}}">
-            {{end}}
-            <div class="flex justify-end space-x-2">
-                <button type="button" onclick="hideCreateFolderModal()"
-                    class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">取消</button>
-                <button type="submit"
-                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">创建</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- 重命名模态框 -->
-<div id="rename-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-md p-6 w-full max-w-md">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">重命名</h3>
-        <form id="rename-form">
-            <input type="hidden" id="rename-item-id">
-            <input type="text" id="rename-item-name" name="name" required placeholder="新名称"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
-            <div class="flex justify-end space-x-2">
-                <button type="button" onclick="hideRenameModal()"
-                    class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">取消</button>
-                <button type="submit"
-                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">确定</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- 移动模态框 -->
-<div id="move-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-md p-6 w-full max-w-md">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">移动到</h3>
-        <form id="move-form">
-            <input type="hidden" id="move-item-id">
-            <select id="move-target-id" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
-                <option value="">根目录</option>
-            </select>
-            <div class="flex justify-end space-x-2">
-                <button type="button" onclick="hideMoveModal()"
-                    class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">取消</button>
-                <button type="submit"
-                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">确定</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- 分享模态框 -->
-<div id="share-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-md p-6 w-full max-w-md">
-        <!-- 创建状态 -->
-        <div id="share-form-view">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">创建分享</h3>
-            <form id="share-form">
-                <input type="hidden" id="share-item-id">
-                <input type="hidden" id="share-item-type">
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">项目名称</label>
-                    <input type="text" id="share-project-name" name="project_name" required placeholder="请输入项目名称"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">密码（可选）</label>
-                    <input type="text" id="share-password" name="password" placeholder="留空则无需密码"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">有效期</label>
-                    <select id="share-expires" name="expires_in"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="1d">1 天</option>
-                        <option value="7d" selected>7 天</option>
-                        <option value="30d">30 天</option>
-                        <option value="never">永久</option>
-                    </select>
-                </div>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" onclick="hideShareModal()"
-                        class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">取消</button>
-                    <button type="submit"
-                        class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">创建</button>
-                </div>
-            </form>
-        </div>
-        <!-- 成功状态 -->
-        <div id="share-success-view" class="hidden">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">分享创建成功</h3>
-            <p class="text-sm text-green-600 mb-4">分享链接已生成，可复制发送给他人。</p>
-            <div class="flex items-center gap-2 mb-4">
-                <input type="text" id="share-link" readonly
-                    class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm select-all">
-                <button type="button" onclick="copyShareLink()"
-                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm whitespace-nowrap">复制</button>
             </div>
-            <div class="flex justify-end">
-                <button type="button" onclick="hideShareModal()"
-                    class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">关闭</button>
+        </main>
+
+        <!-- 底部 -->
+        <footer class="py-6 text-center border-t border-gray-200 bg-white mt-auto">
+            <p class="text-sm text-gray-500 font-medium">NDisk · 安全便捷的文件分享服务</p>
+        </footer>
+    </div>
+
+    <!-- 创建文件夹模态框 -->
+    <div id="create-folder-modal" class="hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="create-folder-title">
+        <div class="modal-backdrop fixed inset-0 bg-gray-900/60 backdrop-blur-sm" aria-hidden="true"></div>
+        <div class="fixed inset-0 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div class="modal-panel bg-white rounded-2xl shadow-2xl w-full max-w-md border-2 border-gray-100 overflow-hidden">
+                    <div class="p-6">
+                        <h3 id="create-folder-title" class="text-lg font-bold text-gray-900 mb-4">📁 新建文件夹</h3>
+                        <form id="create-folder-form">
+                            <input type="text" id="folder-name" name="name" required placeholder="请输入文件夹名称…"
+                                class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-0 transition-colors font-medium text-gray-900 placeholder-gray-400 mb-4 focus-ring">
+                            {{if .parentID}}
+                            <input type="hidden" name="parent_id" value="{{.parentID}}">
+                            {{end}}
+                            <div class="flex justify-end gap-3">
+                                <button type="button" onclick="hideCreateFolderModal()"
+                                    class="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-colors focus-ring">取消</button>
+                                <button type="submit"
+                                    class="px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl hover:shadow-lg transition-all btn-bounce focus-ring">创建</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- 预览模态框 -->
-<div id="preview-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onclick="closePreview(event)">
-    <div class="bg-white rounded-lg shadow-2xl w-full h-full max-w-[95vw] max-h-[95vh] flex flex-col" onclick="event.stopPropagation()">
-        <!-- 顶部栏 -->
-        <div class="flex items-center justify-between px-4 py-3 border-b">
-            <h3 id="preview-title" class="text-base font-medium text-gray-900 truncate"></h3>
-            <button onclick="hidePreviewModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
-        </div>
-        <!-- 内容区 -->
-        <div id="preview-content" class="flex-1 overflow-auto p-4 flex items-center justify-center">
+    <!-- 重命名模态框 -->
+    <div id="rename-modal" class="hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="rename-title">
+        <div class="modal-backdrop fixed inset-0 bg-gray-900/60 backdrop-blur-sm" aria-hidden="true"></div>
+        <div class="fixed inset-0 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div class="modal-panel bg-white rounded-2xl shadow-2xl w-full max-w-md border-2 border-gray-100 overflow-hidden">
+                    <div class="p-6">
+                        <h3 id="rename-title" class="text-lg font-bold text-gray-900 mb-4">✏️ 重命名</h3>
+                        <form id="rename-form">
+                            <input type="hidden" id="rename-item-id">
+                            <input type="text" id="rename-item-name" name="name" required placeholder="请输入新名称…"
+                                class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-0 transition-colors font-medium text-gray-900 placeholder-gray-400 mb-4 focus-ring">
+                            <div class="flex justify-end gap-3">
+                                <button type="button" onclick="hideRenameModal()"
+                                    class="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-colors focus-ring">取消</button>
+                                <button type="submit"
+                                    class="px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl hover:shadow-lg transition-all btn-bounce focus-ring">确定</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- 上传进度水波球 -->
-<div id="upload-progress-ball">
-    <div class="progress-ball">
-        <div class="water">
-            <div class="wave1"></div>
-            <div class="wave2"></div>
+    <!-- 移动模态框 -->
+    <div id="move-modal" class="hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="move-title">
+        <div class="modal-backdrop fixed inset-0 bg-gray-900/60 backdrop-blur-sm" aria-hidden="true"></div>
+        <div class="fixed inset-0 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div class="modal-panel bg-white rounded-2xl shadow-2xl w-full max-w-md border-2 border-gray-100 overflow-hidden">
+                    <div class="p-6">
+                        <h3 id="move-title" class="text-lg font-bold text-gray-900 mb-4">📦 移动到</h3>
+                        <form id="move-form">
+                            <input type="hidden" id="move-item-id">
+                            <select id="move-target-id" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-0 transition-colors font-medium text-gray-900 mb-4 focus-ring appearance-none bg-white">
+                                <option value="">🏠 根目录</option>
+                            </select>
+                            <div class="flex justify-end gap-3">
+                                <button type="button" onclick="hideMoveModal()"
+                                    class="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-colors focus-ring">取消</button>
+                                <button type="submit"
+                                    class="px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl hover:shadow-lg transition-all btn-bounce focus-ring">确定</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
-        <span class="percent-text" style="color: #3b82f6;">0%</span>
     </div>
-</div>
 
+    <!-- 分享模态框 -->
+    <div id="share-modal" class="hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="share-title">
+        <div class="modal-backdrop fixed inset-0 bg-gray-900/60 backdrop-blur-sm" aria-hidden="true"></div>
+        <div class="fixed inset-0 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div class="modal-panel bg-white rounded-2xl shadow-2xl w-full max-w-md border-2 border-gray-100 overflow-hidden">
+                    <!-- 创建状态 -->
+                    <div id="share-form-view" class="p-6">
+                        <h3 id="share-title" class="text-lg font-bold text-gray-900 mb-4">🔗 创建分享</h3>
+                        <form id="share-form">
+                            <input type="hidden" id="share-item-id">
+                            <input type="hidden" id="share-item-type">
+                            <div class="mb-4">
+                                <label for="share-project-name" class="block text-sm font-bold text-gray-700 mb-2">项目名称</label>
+                                <input type="text" id="share-project-name" name="project_name" required placeholder="请输入项目名称…"
+                                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-0 transition-colors font-medium text-gray-900 placeholder-gray-400 focus-ring">
+                            </div>
+                            <div class="mb-4">
+                                <label for="share-password" class="block text-sm font-bold text-gray-700 mb-2">密码（可选）</label>
+                                <input type="text" id="share-password" name="password" placeholder="留空则无需密码…"
+                                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-0 transition-colors font-medium text-gray-900 placeholder-gray-400 focus-ring">
+                            </div>
+                            <div class="mb-6">
+                                <label for="share-expires" class="block text-sm font-bold text-gray-700 mb-2">有效期</label>
+                                <select id="share-expires" name="expires_in"
+                                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-0 transition-colors font-medium text-gray-900 focus-ring appearance-none bg-white">
+                                    <option value="1d">1 天</option>
+                                    <option value="7d" selected>7 天</option>
+                                    <option value="30d">30 天</option>
+                                    <option value="never">永久</option>
+                                </select>
+                            </div>
+                            <div class="flex justify-end gap-3">
+                                <button type="button" onclick="hideShareModal()"
+                                    class="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-colors focus-ring">取消</button>
+                                <button type="submit"
+                                    class="px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl hover:shadow-lg transition-all btn-bounce focus-ring">创建分享</button>
+                            </div>
+                        </form>
+                    </div>
+                    <!-- 成功状态 -->
+                    <div id="share-success-view" class="hidden p-6">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">✅ 分享创建成功</h3>
+                        <p class="text-sm text-green-600 font-semibold mb-4">分享链接已生成，可复制发送给他人</p>
+                        <div class="flex items-center gap-2 mb-6">
+                            <input type="text" id="share-link" readonly
+                                class="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-sm font-mono text-gray-800 select-all focus-ring">
+                            <button type="button" onclick="copyShareLink()"
+                                class="px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-xl hover:shadow-lg transition-all btn-bounce text-sm whitespace-nowrap focus-ring">复制</button>
+                        </div>
+                        <div class="flex justify-end">
+                            <button type="button" onclick="hideShareModal()"
+                                class="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-colors focus-ring">关闭</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 预览模态框 -->
+    <div id="preview-modal" class="hidden fixed inset-0 z-50" onclick="closePreview(event)" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+        <div class="modal-backdrop fixed inset-0 bg-gray-900/80 backdrop-blur-sm" aria-hidden="true"></div>
+        <div class="fixed inset-0 overflow-hidden p-2 sm:p-4">
+            <div class="modal-panel bg-white rounded-2xl shadow-2xl w-full h-full flex flex-col border-2 border-gray-100" onclick="event.stopPropagation()">
+                <!-- 顶部栏 -->
+                <div class="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b-2 border-gray-100 shrink-0">
+                    <h3 id="preview-title" class="text-base font-bold text-gray-900 truncate pr-4"></h3>
+                    <button onclick="hidePreviewModal()" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors focus-ring shrink-0" aria-label="关闭预览">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <!-- 内容区 -->
+                <div id="preview-content" class="flex-1 overflow-auto p-4 sm:p-6 flex items-center justify-center">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 上传进度水波球 -->
+    <div id="upload-progress-ball" aria-live="polite" aria-label="上传进度">
+        <div class="progress-ball">
+            <div class="water">
+                <div class="wave1"></div>
+                <div class="wave2"></div>
+            </div>
+            <span class="percent-text">0%</span>
+        </div>
+    </div>
+
+    <script>
+        // 下拉菜单（fixed 定位 + 智能方向）
+        function toggleDropdown(id) {
+            document.querySelectorAll('.dropdown-menu').forEach(function(d) {
+                if (d.id !== id) d.classList.remove('open');
+            });
+            var el = document.getElementById(id);
+            if (!el) return;
+            if (el.classList.contains('open')) {
+                el.classList.remove('open');
+                return;
+            }
+            // 找到触发按钮
+            var btn = el.previousElementSibling || el.parentElement.querySelector('[onclick*="' + id + '"]');
+            var rect = btn.getBoundingClientRect();
+            var menuHeight = 280; // 估算菜单高度
+            var showAbove = rect.bottom + menuHeight > window.innerHeight;
+            if (showAbove) {
+                el.style.top = 'auto';
+                el.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+            } else {
+                el.style.top = (rect.bottom + 4) + 'px';
+                el.style.bottom = 'auto';
+            }
+            el.style.right = (window.innerWidth - rect.right) + 'px';
+            el.style.left = 'auto';
+            el.classList.add('open');
+        }
+
+        // 点击外部关闭下拉
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('[onclick*="toggleDropdown"]') && !e.target.closest('.dropdown-menu')) {
+                document.querySelectorAll('.dropdown-menu.open').forEach(function(d) {
+                    d.classList.remove('open');
+                });
+            }
+        });
+
+        // ESC 关闭所有模态框
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                hideCreateFolderModal();
+                hideRenameModal();
+                hideMoveModal();
+                hideShareModal();
+                hidePreviewModal();
+            }
+        });
+
+        // 点击模态框背景关闭
+        document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) {
+            backdrop.addEventListener('click', function() {
+                hideCreateFolderModal();
+                hideRenameModal();
+                hideMoveModal();
+                hideShareModal();
+            });
+        });
+
+        // 消息提示（兼容 app.js 的布尔值调用和字符串调用）
+        function showMessage(text, type) {
+            var el = document.getElementById('message');
+            if (!el) return;
+            el.textContent = text;
+            el.className = 'mb-6 p-4 rounded-xl font-semibold';
+            // 支持 boolean (true=error) 和 string ('success'/'error') 两种调用方式
+            if (type === true || type === 'error') {
+                el.classList.add('bg-red-100', 'text-red-800', 'border-2', 'border-red-200');
+            } else if (type === 'success') {
+                el.classList.add('bg-green-100', 'text-green-800', 'border-2', 'border-green-200');
+            } else {
+                el.classList.add('bg-blue-100', 'text-blue-800', 'border-2', 'border-blue-200');
+            }
+            el.classList.remove('hidden');
+            setTimeout(function() { el.classList.add('hidden'); }, 3000);
+        }
+    </script>
 </body>
 </html>
 {{end}}

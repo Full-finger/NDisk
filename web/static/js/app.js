@@ -120,64 +120,6 @@ function setProgressBallError() {
 // ========== 登录/注册 ==========
 
 document.addEventListener('DOMContentLoaded', function() {
-    var loginForm = document.getElementById('login-form');
-    if (loginForm) {
-        loginForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            var username = document.getElementById('username').value;
-            var password = document.getElementById('password').value;
-
-            try {
-                var response = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: username, password: password }),
-                });
-                var data = await response.json();
-                if (response.ok) {
-                    setAccessToken(data.access_token);
-                    window.location.href = '/files';
-                } else {
-                    showError(data.error || '登录失败');
-                }
-            } catch (err) {
-                showError('网络错误，请重试');
-            }
-        });
-    }
-
-    var registerForm = document.getElementById('register-form');
-    if (registerForm) {
-        registerForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            var username = document.getElementById('username').value;
-            var password = document.getElementById('password').value;
-            var confirmPassword = document.getElementById('confirm-password').value;
-
-            if (password !== confirmPassword) {
-                showError('两次输入的密码不一致');
-                return;
-            }
-
-            try {
-                var response = await fetch('/api/auth/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: username, password: password }),
-                });
-                var data = await response.json();
-                if (response.ok) {
-                    showSuccess('注册成功，即将跳转到登录页面');
-                    setTimeout(function() { window.location.href = '/login'; }, 2000);
-                } else {
-                    showError(data.error || '注册失败');
-                }
-            } catch (err) {
-                showError('网络错误，请重试');
-            }
-        });
-    }
-
     // ========== 文件上传（Resumable.js） ==========
     var fileInput = document.getElementById('file-input');
     if (fileInput) {
@@ -432,7 +374,7 @@ function showRenameModal(id, currentName) {
         nameInput.focus();
         nameInput.select();
     }
-    document.querySelectorAll('[id^="dropdown-"]').forEach(function(el) { el.classList.add('hidden'); });
+    document.querySelectorAll('.dropdown-menu.open').forEach(function(el) { el.classList.remove('open'); });
 }
 
 function showRenameModalFromLink(element) {
@@ -452,7 +394,7 @@ function showMoveModal(element) {
 
     if (modal && idInput && select) {
         idInput.value = id;
-        document.querySelectorAll('[id^="dropdown-"]').forEach(function(el) { el.classList.add('hidden'); });
+        document.querySelectorAll('.dropdown-menu.open').forEach(function(el) { el.classList.remove('open'); });
         select.innerHTML = '<option value="">根目录</option>';
 
         authFetch('/api/folders/all').then(function(response) { return response.json(); }).then(function(data) {
@@ -496,7 +438,7 @@ function showShareModal(element) {
         nameInput.value = name;
         document.getElementById('share-form-view').classList.remove('hidden');
         document.getElementById('share-success-view').classList.add('hidden');
-        document.querySelectorAll('[id^="dropdown-"]').forEach(function(el) { el.classList.add('hidden'); });
+        document.querySelectorAll('.dropdown-menu.open').forEach(function(el) { el.classList.remove('open'); });
         modal.classList.remove('hidden');
     }
 }
@@ -597,22 +539,6 @@ function logout() {
     });
 }
 
-// ========== 下拉菜单 ==========
-
-function toggleDropdown(id) {
-    document.querySelectorAll('[id^="dropdown-"]').forEach(function(el) {
-        if (el.id !== id) el.classList.add('hidden');
-    });
-    var dropdown = document.getElementById(id);
-    if (dropdown) dropdown.classList.toggle('hidden');
-}
-
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('[onclick^="toggleDropdown"]') && !e.target.closest('[id^="dropdown-"]')) {
-        document.querySelectorAll('[id^="dropdown-"]').forEach(function(el) { el.classList.add('hidden'); });
-    }
-});
-
 // ========== 文件预览 ==========
 
 var PREVIEW_MAX_SIZE = 50 * 1024 * 1024; // 50MB
@@ -649,7 +575,7 @@ function previewFile(element) {
     var size = parseInt(element.getAttribute('data-size'), 10);
 
     // 关闭下拉菜单
-    document.querySelectorAll('[id^="dropdown-"]').forEach(function(el) { el.classList.add('hidden'); });
+    document.querySelectorAll('.dropdown-menu.open').forEach(function(el) { el.classList.remove('open'); });
 
     var category = getFileCategory(name);
     if (!category) {

@@ -4,258 +4,675 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#ffffff">
     <title>NFS 挂载管理 - NDisk</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['Nunito', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        },
+                        cute: {
+                            pink: '#ec4899',
+                            purple: '#8b5cf6',
+                            mint: '#10b981',
+                            orange: '#f59e0b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <script>window.__ACCESS_TOKEN__ = "{{.accessToken}}";</script>
     <script src="/static/js/app.js"></script>
+    <style>
+        @media (prefers-reduced-motion: reduce) {
+            *, ::before, ::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        * { font-family: 'Nunito', sans-serif; }
+
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-bounce {
+            transition: transform 0.15s ease, box-shadow 0.2s ease;
+        }
+        .btn-bounce:hover {
+            transform: scale(1.02);
+        }
+        .btn-bounce:active {
+            transform: scale(0.98);
+        }
+
+        .focus-ring:focus-visible {
+            outline: 3px solid #3b82f6;
+            outline-offset: 2px;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.4s ease forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .row-hover {
+            transition: background-color 0.15s ease;
+        }
+        .row-hover:hover {
+            background-color: #f8fafc;
+        }
+
+        .dot-pattern {
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* 代码块 */
+        .code-block {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border: 2px solid #334155;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        .code-block code {
+            color: #a5f3fc;
+        }
+
+        .code-block .comment {
+            color: #64748b;
+        }
+
+        .code-block .keyword {
+            color: #c084fc;
+        }
+
+        .code-block .path {
+            color: #fbbf24;
+        }
+
+        .code-block .host {
+            color: #34d399;
+        }
+
+        /* Token 脉冲指示器 */
+        .token-pulse {
+            position: relative;
+        }
+        .token-pulse::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: -8px;
+            transform: translateY(-50%);
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+        }
+
+        /* 模态框动画 */
+        .modal-backdrop {
+            transition: opacity 0.2s ease;
+        }
+        .modal-panel {
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        /* 滑入动画 */
+        .slide-up {
+            animation: slideUp 0.5s ease forwards;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 信息卡片 hover */
+        .info-card {
+            transition: border-color 0.2s ease, background-color 0.2s ease;
+        }
+        .info-card:hover {
+            border-color: #93c5fd;
+            background-color: #f0f9ff;
+        }
+
+        /* 复制按钮动画 */
+        .copy-feedback {
+            animation: copyPop 0.3s ease;
+        }
+        @keyframes copyPop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-<div class="min-h-screen">
-    <!-- 顶部导航 -->
-    <nav class="bg-white shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <h1 class="text-xl font-bold text-gray-800">NDisk NFS 挂载管理</h1>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <a href="/files" class="text-gray-600 hover:text-blue-600 font-medium">文件管理</a>
-                    <a href="/share" class="text-gray-600 hover:text-blue-600 font-medium">我的分享</a>
-                    <a href="/nfs" class="text-blue-600 hover:text-blue-800 font-medium">NFS 挂载</a>
-                    <span class="text-gray-400">|</span>
-                    <span class="text-gray-600">欢迎，{{.username}}</span>
-                    <button onclick="logout()" class="text-red-600 hover:text-red-800">退出登录</button>
+<body class="bg-gray-50 min-h-screen">
+    <div class="min-h-screen flex flex-col">
+        <!-- 轻微装饰背景 -->
+        <div class="fixed inset-0 dot-pattern pointer-events-none -z-10 opacity-50"></div>
+
+        <!-- 顶部导航 -->
+        <nav class="bg-white border-b-2 border-gray-100 sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16 items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center shadow-md">
+                            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+                            </svg>
+                        </div>
+                        <h1 class="text-xl font-extrabold text-gray-900">NDisk</h1>
+                        <span class="hidden sm:inline-block px-2.5 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">NFS 挂载</span>
+                    </div>
+                    <div class="flex items-center gap-1 sm:gap-2">
+                        <a href="/files" class="px-3 py-2 text-sm font-semibold text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-ring">文件管理</a>
+                        <a href="/share" class="px-3 py-2 text-sm font-semibold text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-ring">我的分享</a>
+                        <a href="/nfs" class="px-3 py-2 text-sm font-bold text-blue-600 bg-blue-50 rounded-lg focus-ring" aria-current="page">NFS</a>
+                        <div class="w-px h-6 bg-gray-200 mx-1 hidden sm:block" aria-hidden="true"></div>
+                        <span class="text-sm text-gray-700 font-medium hidden sm:block">{{.username}}</span>
+                        <button onclick="logout()" class="px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-lg transition-colors focus-ring" aria-label="退出登录">退出</button>
+                    </div>
                 </div>
             </div>
-        </div>
-    </nav>
+        </nav>
 
-    <!-- 主内容区 -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <!-- 消息提示 -->
-        <div id="message" class="hidden mb-4 p-3 rounded-md"></div>
+        <!-- 主内容区 -->
+        <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+            <!-- 页面标题 -->
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
+                <div>
+                    <h2 class="text-2xl sm:text-3xl font-extrabold text-gray-900">NFS 挂载管理 🖥️</h2>
+                    <p class="mt-1 text-gray-500 font-medium">通过 NFS 协议将网盘挂载为本地磁盘</p>
+                </div>
+            </div>
 
-        <!-- 使用说明 -->
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <h3 class="text-blue-800 font-medium mb-2">📖 NFS 挂载使用说明</h3>
-            <ol class="text-sm text-blue-700 space-y-1 list-decimal list-inside">
-                <li>点击下方「生成 Token」按钮创建一个新的挂载令牌</li>
-                <li>复制生成的挂载命令，在支持 NFSv3 的系统上执行</li>
-                <li>挂载后即可像本地文件系统一样访问您的网盘文件</li>
-            </ol>
-            <p class="text-xs text-blue-600 mt-2">注意：需要服务端启用 NFS 支持（配置 <code>[nfs] enabled = true</code>）</p>
-        </div>
+            <!-- 使用说明卡片 -->
+            <div class="bg-white rounded-2xl shadow-lg border-2 border-gray-100 p-6 mb-8 slide-up">
+                <div class="flex items-start gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center shrink-0">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-lg font-bold text-gray-900 mb-3">📖 使用说明</h3>
+                        <div class="grid sm:grid-cols-3 gap-4">
+                            <div class="info-card flex items-start gap-3 p-4 rounded-xl border-2 border-gray-100 bg-gray-50">
+                                <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0 text-sm font-extrabold text-blue-600">1</div>
+                                <div>
+                                    <div class="font-bold text-gray-800 text-sm">生成 Token</div>
+                                    <div class="text-xs text-gray-500 mt-0.5">点击下方按钮创建挂载令牌</div>
+                                </div>
+                            </div>
+                            <div class="info-card flex items-start gap-3 p-4 rounded-xl border-2 border-gray-100 bg-gray-50">
+                                <div class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center shrink-0 text-sm font-extrabold text-purple-600">2</div>
+                                <div>
+                                    <div class="font-bold text-gray-800 text-sm">复制命令</div>
+                                    <div class="text-xs text-gray-500 mt-0.5">获取 NFS 挂载命令</div>
+                                </div>
+                            </div>
+                            <div class="info-card flex items-start gap-3 p-4 rounded-xl border-2 border-gray-100 bg-gray-50">
+                                <div class="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center shrink-0 text-sm font-extrabold text-green-600">3</div>
+                                <div>
+                                    <div class="font-bold text-gray-800 text-sm">执行挂载</div>
+                                    <div class="text-xs text-gray-500 mt-0.5">在支持 NFSv3 的系统上运行</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center gap-2 text-xs text-gray-500">
+                            <svg class="w-4 h-4 text-amber-500 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                            </svg>
+                            <span>需要服务端启用 NFS 支持（配置 <code class="bg-gray-100 px-1.5 py-0.5 rounded font-bold text-gray-700">[nfs] enabled = true</code>）</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-        <!-- 创建 Token -->
-        <div class="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 class="text-lg font-medium text-gray-900 mb-4">生成新的挂载 Token</h2>
-            <div class="flex items-center space-x-4">
-                <input type="text" id="token-description" placeholder="Token 描述（可选，例如：我的笔记本）"
-                    class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <button onclick="createToken()" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">
-                    生成 Token
+            <!-- 创建 Token 区域 -->
+            <div class="bg-white rounded-2xl shadow-lg border-2 border-gray-100 p-6 mb-8 slide-up" style="animation-delay: 0.1s;">
+                <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                    </svg>
+                    生成新的挂载 Token
+                </h3>
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <input type="text" id="token-description" placeholder="Token 描述（可选），例如：我的笔记本…"
+                        class="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-0 transition-colors font-medium text-gray-900 placeholder-gray-400 focus-ring">
+                    <button onclick="createToken()" class="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all btn-bounce focus-ring whitespace-nowrap">
+                        <svg class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        生成 Token
+                    </button>
+                </div>
+            </div>
+
+            <!-- 消息提示 -->
+            <div id="message" class="hidden mb-6 p-4 rounded-xl font-semibold" role="alert" aria-live="polite"></div>
+
+            <!-- 加载中 -->
+            <div id="loading-state" class="text-center py-20">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white shadow-lg mb-4 border-2 border-gray-100">
+                    <svg class="w-8 h-8 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
+                <p class="text-gray-600 font-semibold">加载中…</p>
+            </div>
+
+            <!-- Token 列表 -->
+            <div id="tokens-container" class="hidden">
+                <!-- 桌面端表格 -->
+                <div class="hidden md:block bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden slide-up" style="animation-delay: 0.2s;">
+                    <div class="px-6 py-4 border-b-2 border-gray-100 bg-gray-50 flex items-center justify-between">
+                        <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                            </svg>
+                            我的挂载 Token
+                        </h3>
+                        <span id="token-count" class="text-xs font-bold text-gray-400 bg-gray-200 px-2.5 py-1 rounded-full"></span>
+                    </div>
+                    <table class="min-w-full">
+                        <thead>
+                            <tr class="border-b-2 border-gray-100">
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wide">描述</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wide">Token</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wide">创建时间</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wide">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100" id="token-list">
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 移动端卡片 -->
+                <div class="md:hidden space-y-4" id="token-cards"></div>
+            </div>
+
+            <!-- 空状态 -->
+            <div id="empty-state" class="hidden text-center py-20">
+                <div class="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-br from-emerald-100 to-teal-100 mb-6">
+                    <svg class="w-12 h-12 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-extrabold text-gray-900 mb-2">暂无挂载 Token</h3>
+                <p class="text-gray-500 font-medium mb-6 max-w-sm mx-auto">生成一个 Token 来通过 NFS 协议挂载您的网盘文件</p>
+                <button onclick="document.getElementById('token-description').focus()" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all btn-bounce focus-ring">
+                    <svg class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                    </svg>
+                    立即生成 Token
                 </button>
             </div>
-        </div>
+        </main>
 
-        <!-- Token 列表 -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="px-6 py-4 border-b border-gray-200">
-                <h2 class="text-lg font-medium text-gray-900">我的挂载 Token</h2>
+        <!-- 底部 -->
+        <footer class="py-6 text-center border-t border-gray-200 bg-white mt-auto">
+            <p class="text-sm text-gray-500 font-medium">NDisk · 安全便捷的文件分享服务</p>
+        </footer>
+    </div>
+
+    <!-- 挂载命令弹窗 -->
+    <div id="mount-modal" class="hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="mount-modal-title">
+        <div class="modal-backdrop fixed inset-0 bg-gray-900/60 backdrop-blur-sm" aria-hidden="true"></div>
+        <div class="fixed inset-0 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div class="modal-panel bg-white rounded-2xl shadow-2xl w-full max-w-lg border-2 border-gray-100 overflow-hidden">
+                    <div class="p-6">
+                        <!-- 成功标题 -->
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-green-100 to-emerald-100 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 id="mount-modal-title" class="text-lg font-bold text-gray-900">Token 已生成</h3>
+                                <p class="text-sm text-gray-500">请使用以下命令挂载 NFS 共享</p>
+                            </div>
+                        </div>
+
+                        <!-- 挂载命令 -->
+                        <div class="code-block rounded-xl p-5 mb-4 overflow-x-auto">
+                            <pre id="mount-command" class="text-sm leading-relaxed whitespace-pre-wrap"></pre>
+                        </div>
+
+                        <!-- 警告提示 -->
+                        <div class="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border-2 border-amber-200 mb-6">
+                            <svg class="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                            </svg>
+                            <p class="text-xs font-semibold text-amber-700">请妥善保管 Token，拥有 Token 即可访问您的全部网盘文件。关闭此窗口后 Token 将不再显示。</p>
+                        </div>
+
+                        <!-- 操作按钮 -->
+                        <div class="flex justify-end gap-3">
+                            <button onclick="closeMountModal()" class="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-colors focus-ring">
+                                关闭
+                            </button>
+                            <button onclick="copyMountCommand()" id="copy-cmd-btn" class="inline-flex items-center px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl hover:shadow-lg transition-all btn-bounce focus-ring">
+                                <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                                </svg>
+                                复制命令
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">描述</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200" id="token-list">
-                    <!-- 动态加载 -->
-                </tbody>
-            </table>
-        </div>
-
-        <!-- 空状态 -->
-        <div id="empty-state" class="hidden text-center py-12">
-            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-900">暂无挂载 Token</h3>
-            <p class="mt-1 text-sm text-gray-500">生成一个 Token 来通过 NFS 协议挂载您的网盘</p>
-        </div>
-    </main>
-</div>
-
-<!-- 加载中提示 -->
-<div id="loading-state" class="text-center py-12">
-    <p class="text-gray-500">加载中...</p>
-</div>
-
-<!-- 挂载命令弹窗 -->
-<div id="mount-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-6 border w-full max-w-lg shadow-lg rounded-md bg-white">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">🎉 Token 已生成</h3>
-        <p class="text-sm text-gray-600 mb-3">请使用以下命令挂载 NFS 共享（需要 root 权限）：</p>
-        <div class="bg-gray-900 rounded-md p-4 mb-4">
-            <code id="mount-command" class="text-green-400 text-sm block whitespace-pre-wrap"></code>
-        </div>
-        <p class="text-xs text-gray-500 mb-4">⚠️ 请妥善保管 Token，拥有 Token 即可访问您的全部网盘文件。关闭此窗口后 Token 将不再显示。</p>
-        <div class="flex justify-end space-x-3">
-            <button onclick="copyMountCommand()" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">
-                复制命令
-            </button>
-            <button onclick="closeMountModal()" class="px-4 py-2 bg-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-400">
-                关闭
-            </button>
         </div>
     </div>
-</div>
 
-<script>
-    var currentServerHost = window.location.hostname;
+    <!-- 删除确认模态框 -->
+    <div id="delete-modal" class="hidden fixed inset-0 z-50" aria-labelledby="delete-modal-title" role="dialog" aria-modal="true">
+        <div class="modal-backdrop fixed inset-0 bg-gray-900/60 backdrop-blur-sm" aria-hidden="true"></div>
+        <div class="fixed inset-0 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div class="modal-panel relative bg-white rounded-2xl shadow-2xl w-full max-w-md border-2 border-gray-100 overflow-hidden">
+                    <div class="p-6">
+                        <div class="flex items-start gap-4">
+                            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100">
+                                <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900" id="delete-modal-title">确认吊销 Token</h3>
+                                <p class="mt-2 text-sm text-gray-600">吊销后使用该 Token 的 NFS 挂载将断开连接，此操作不可撤销。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-100">
+                        <button type="button" id="cancel-delete-btn" class="px-4 py-2.5 text-sm font-bold text-gray-700 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-colors focus-ring">
+                            取消
+                        </button>
+                        <button type="button" id="confirm-delete-btn" class="px-4 py-2.5 text-sm font-bold text-white bg-red-500 rounded-xl hover:bg-red-600 transition-colors focus-ring">
+                            确认吊销
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    document.addEventListener('DOMContentLoaded', function() {
-        loadTokens();
-    });
+    <script>
+        var currentServerHost = window.location.hostname;
 
-    function loadTokens() {
-        authFetch('/api/nfs/tokens').then(function(response) {
-            return response.json();
-        }).then(function(data) {
-            document.getElementById('loading-state').classList.add('hidden');
-            if (data && data.length > 0) {
-                renderTokens(data);
-            } else {
-                document.getElementById('empty-state').classList.remove('hidden');
-            }
-        }).catch(function(err) {
-            document.getElementById('loading-state').classList.add('hidden');
-            showMessage('加载 Token 列表失败', true);
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTokens();
         });
-    }
 
-    function renderTokens(tokens) {
-        var tbody = document.getElementById('token-list');
-        tbody.innerHTML = '';
-
-        tokens.forEach(function(t) {
-            var tr = document.createElement('tr');
-            tr.className = 'hover:bg-gray-50';
-            tr.id = 'token-row-' + t.id;
-
-            // 描述
-            var tdDesc = document.createElement('td');
-            tdDesc.className = 'px-6 py-4 whitespace-nowrap';
-            tdDesc.innerHTML = '<span class="text-gray-900 font-medium">' + escapeHtml(t.description || '无描述') + '</span>';
-            tr.appendChild(tdDesc);
-
-            // Token（脱敏显示）
-            var tdToken = document.createElement('td');
-            tdToken.className = 'px-6 py-4 whitespace-nowrap';
-            var maskedToken = t.token.substring(0, 8) + '...' + t.token.substring(t.token.length - 4);
-            tdToken.innerHTML = '<code class="text-xs bg-gray-100 px-2 py-1 rounded">' + maskedToken + '</code>';
-            tr.appendChild(tdToken);
-
-            // 创建时间
-            var tdCreated = document.createElement('td');
-            tdCreated.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-500';
-            tdCreated.textContent = t.created_at;
-            tr.appendChild(tdCreated);
-
-            // 操作
-            var tdActions = document.createElement('td');
-            tdActions.className = 'px-6 py-4 whitespace-nowrap';
-            tdActions.innerHTML = '<div class="flex items-center space-x-3">'
-                + '<button onclick="deleteToken(' + t.id + ')" class="text-red-600 hover:text-red-800 text-sm">吊销</button>'
-                + '</div>';
-            tr.appendChild(tdActions);
-
-            tbody.appendChild(tr);
-        });
-    }
-
-    function createToken() {
-        var desc = document.getElementById('token-description').value.trim();
-
-        authFetch('/api/nfs/tokens', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ description: desc })
-        }).then(function(response) {
-            return response.json();
-        }).then(function(data) {
-            if (data.token) {
-                document.getElementById('token-description').value = '';
-                showMessage('Token 已生成');
-
-                // 显示挂载命令
-                var mountCmd = '# 创建挂载点\n'
-                    + 'mkdir -p /mnt/ndisk\n\n'
-                    + '# 挂载 NFS 共享\n'
-                    + 'mount -t nfs -o vers=3,tcp,port=2049,mountport=2049 '
-                    + currentServerHost + ':' + data.mount_path + ' /mnt/ndisk';
-                document.getElementById('mount-command').textContent = mountCmd;
-                document.getElementById('mount-modal').classList.remove('hidden');
-
-                loadTokens();
-            } else {
-                showMessage(data.error || '创建失败', true);
-            }
-        }).catch(function() {
-            showMessage('网络错误，请重试', true);
-        });
-    }
-
-    function deleteToken(id) {
-        if (!confirm('确定要吊销此 Token 吗？使用该 Token 的 NFS 挂载将断开连接。')) return;
-
-        authFetch('/api/nfs/tokens/' + id, { method: 'DELETE' }).then(function(response) {
-            return response.json();
-        }).then(function(data) {
-            if (data.message) {
-                showMessage('Token 已吊销');
-                var row = document.getElementById('token-row-' + id);
-                if (row) row.remove();
-                var tbody = document.getElementById('token-list');
-                if (tbody.children.length === 0) {
+        function loadTokens() {
+            authFetch('/api/nfs/tokens').then(function(response) {
+                return response.json();
+            }).then(function(data) {
+                document.getElementById('loading-state').classList.add('hidden');
+                if (data && data.length > 0) {
+                    document.getElementById('tokens-container').classList.remove('hidden');
+                    renderTokens(data);
+                } else {
                     document.getElementById('empty-state').classList.remove('hidden');
                 }
-            } else {
-                showMessage(data.error || '吊销失败', true);
+            }).catch(function(err) {
+                document.getElementById('loading-state').classList.add('hidden');
+                showMessage('加载 Token 列表失败，请刷新重试', 'error');
+            });
+        }
+
+        function renderTokens(tokens) {
+            var tbody = document.getElementById('token-list');
+            var cardsContainer = document.getElementById('token-cards');
+            tbody.innerHTML = '';
+            cardsContainer.innerHTML = '';
+
+            // 更新计数
+            var countEl = document.getElementById('token-count');
+            if (countEl) countEl.textContent = tokens.length + ' 个';
+
+            tokens.forEach(function(t, index) {
+                var maskedToken = t.token.substring(0, 8) + '••••••••' + t.token.substring(t.token.length - 4);
+
+                // 桌面端行
+                var tr = document.createElement('tr');
+                tr.className = 'row-hover fade-in';
+                tr.id = 'token-row-' + t.id;
+                tr.style.animationDelay = (index * 0.05) + 's';
+
+                tr.innerHTML = '<td class="px-6 py-4">'
+                    + '<div class="flex items-center gap-3">'
+                    + '<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center shrink-0">'
+                    + '<svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>'
+                    + '</div>'
+                    + '<span class="font-bold text-gray-900">' + escapeHtml(t.description || '无描述') + '</span>'
+                    + '</div>'
+                    + '</td>'
+                    + '<td class="px-6 py-4">'
+                    + '<div class="token-pulse inline-flex items-center">'
+                    + '<code class="text-xs font-bold bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg border border-gray-200">' + escapeHtml(maskedToken) + '</code>'
+                    + '</div>'
+                    + '</td>'
+                    + '<td class="px-6 py-4 text-sm font-semibold text-gray-500">' + formatDateTime(t.created_at) + '</td>'
+                    + '<td class="px-6 py-4">'
+                    + '<div class="flex items-center justify-end">'
+                    + '<button onclick="showDeleteModal(' + t.id + ')" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-lg transition-colors focus-ring" aria-label="吊销 Token">'
+                    + '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>'
+                    + '吊销'
+                    + '</button>'
+                    + '</div>'
+                    + '</td>';
+
+                tbody.appendChild(tr);
+
+                // 移动端卡片
+                var card = document.createElement('div');
+                card.className = 'bg-white rounded-2xl shadow-lg border-2 border-gray-100 p-5 card-hover fade-in';
+                card.style.animationDelay = (index * 0.05) + 's';
+
+                card.innerHTML = '<div class="flex items-start justify-between gap-3">'
+                    + '<div class="flex items-start gap-3 min-w-0">'
+                    + '<div class="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center shrink-0">'
+                    + '<svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>'
+                    + '</div>'
+                    + '<div class="min-w-0">'
+                    + '<div class="font-bold text-gray-900">' + escapeHtml(t.description || '无描述') + '</div>'
+                    + '<code class="inline-block mt-1 text-xs font-bold bg-gray-100 text-gray-700 px-2 py-1 rounded-lg">' + escapeHtml(maskedToken) + '</code>'
+                    + '<div class="text-xs text-gray-400 mt-2">' + formatDateTime(t.created_at) + '</div>'
+                    + '</div>'
+                    + '</div>'
+                    + '<button onclick="showDeleteModal(' + t.id + ')" class="p-2 text-red-600 hover:bg-red-50 rounded-lg shrink-0 transition-colors focus-ring" aria-label="吊销 Token">'
+                    + '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>'
+                    + '</button>'
+                    + '</div>';
+
+                cardsContainer.appendChild(card);
+            });
+        }
+
+        function createToken() {
+            var desc = document.getElementById('token-description').value.trim();
+
+            authFetch('/api/nfs/tokens', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ description: desc })
+            }).then(function(response) {
+                return response.json();
+            }).then(function(data) {
+                if (data.token) {
+                    document.getElementById('token-description').value = '';
+                    showMessage('Token 已生成 ✓', 'success');
+
+                    // 显示挂载命令
+                    var mountCmd = '<span class="comment"># 创建挂载点</span>\n'
+                        + '<span class="keyword">mkdir -p</span> <span class="path">/mnt/ndisk</span>\n\n'
+                        + '<span class="comment"># 挂载 NFS 共享</span>\n'
+                        + '<span class="keyword">mount</span> -t nfs -o vers=3,tcp,port=2049,mountport=2049 \\\n'
+                        + '    <span class="host">' + escapeHtml(currentServerHost) + '</span>:<span class="path">' + escapeHtml(data.mount_path) + '</span> <span class="path">/mnt/ndisk</span>';
+                    document.getElementById('mount-command').innerHTML = mountCmd;
+                    document.getElementById('mount-modal').classList.remove('hidden');
+
+                    loadTokens();
+                } else {
+                    showMessage(data.error || '创建失败，请重试', 'error');
+                }
+            }).catch(function() {
+                showMessage('网络错误，请检查连接后重试', 'error');
+            });
+        }
+
+        // 删除模态框
+        var deleteTokenId = null;
+
+        function showDeleteModal(id) {
+            deleteTokenId = id;
+            document.getElementById('delete-modal').classList.remove('hidden');
+            document.getElementById('cancel-delete-btn').focus();
+        }
+
+        function hideDeleteModal() {
+            deleteTokenId = null;
+            document.getElementById('delete-modal').classList.add('hidden');
+        }
+
+        document.getElementById('cancel-delete-btn').addEventListener('click', hideDeleteModal);
+        document.getElementById('confirm-delete-btn').addEventListener('click', function() {
+            if (deleteTokenId) {
+                deleteToken(deleteTokenId);
+                hideDeleteModal();
             }
-        }).catch(function() {
-            showMessage('网络错误，请重试', true);
         });
-    }
 
-    function copyMountCommand() {
-        var cmd = document.getElementById('mount-command').textContent;
-        navigator.clipboard.writeText(cmd).then(function() {
-            showMessage('挂载命令已复制到剪贴板');
-        }).catch(function() {
-            var input = document.createElement('textarea');
-            input.value = cmd;
-            document.body.appendChild(input);
-            input.select();
-            document.execCommand('copy');
-            document.body.removeChild(input);
-            showMessage('挂载命令已复制到剪贴板');
+        // 点击背景关闭
+        document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) {
+            backdrop.addEventListener('click', function() {
+                hideDeleteModal();
+                closeMountModal();
+            });
         });
-    }
 
-    function closeMountModal() {
-        document.getElementById('mount-modal').classList.add('hidden');
-    }
+        // ESC 关闭
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                hideDeleteModal();
+                closeMountModal();
+            }
+        });
 
-    function escapeHtml(text) {
-        var div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-</script>
+        function deleteToken(id) {
+            authFetch('/api/nfs/tokens/' + id, { method: 'DELETE' }).then(function(response) {
+                return response.json();
+            }).then(function(data) {
+                if (data.message) {
+                    showMessage('Token 已成功吊销', 'success');
+                    var row = document.getElementById('token-row-' + id);
+                    if (row) row.remove();
+
+                    var tbody = document.getElementById('token-list');
+                    if (tbody.children.length === 0) {
+                        document.getElementById('tokens-container').classList.add('hidden');
+                        document.getElementById('empty-state').classList.remove('hidden');
+                    }
+                } else {
+                    showMessage(data.error || '吊销失败，请重试', 'error');
+                }
+            }).catch(function() {
+                showMessage('网络错误，请检查连接后重试', 'error');
+            });
+        }
+
+        function copyMountCommand() {
+            // 获取纯文本
+            var cmdEl = document.getElementById('mount-command');
+            var plainText = cmdEl.textContent || cmdEl.innerText;
+
+            navigator.clipboard.writeText(plainText).then(function() {
+                showMessage('挂载命令已复制到剪贴板 ✓', 'success');
+                var btn = document.getElementById('copy-cmd-btn');
+                btn.classList.add('copy-feedback');
+                setTimeout(function() { btn.classList.remove('copy-feedback'); }, 300);
+            }).catch(function() {
+                var input = document.createElement('textarea');
+                input.value = plainText;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                showMessage('挂载命令已复制到剪贴板 ✓', 'success');
+            });
+        }
+
+        function closeMountModal() {
+            document.getElementById('mount-modal').classList.add('hidden');
+        }
+
+        function formatDateTime(dateString) {
+            if (!dateString) return '';
+            try {
+                var date = new Date(dateString);
+                return new Intl.DateTimeFormat('zh-CN', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }).format(date);
+            } catch (e) {
+                return dateString;
+            }
+        }
+
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showMessage(text, type) {
+            var el = document.getElementById('message');
+            el.textContent = text;
+            el.className = 'mb-6 p-4 rounded-xl font-semibold';
+            if (type === 'success') {
+                el.classList.add('bg-green-100', 'text-green-800', 'border-2', 'border-green-200');
+            } else if (type === 'error') {
+                el.classList.add('bg-red-100', 'text-red-800', 'border-2', 'border-red-200');
+            } else {
+                el.classList.add('bg-blue-100', 'text-blue-800', 'border-2', 'border-blue-200');
+            }
+            el.classList.remove('hidden');
+            setTimeout(function() { el.classList.add('hidden'); }, 3000);
+        }
+    </script>
 </body>
 </html>
 {{end}}

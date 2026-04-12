@@ -4,82 +4,478 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#f8fafc">
     <title>{{.project_name}} - NDisk 分享</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['Nunito', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        @media (prefers-reduced-motion: reduce) {
+            *, ::before, ::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        * { font-family: 'Nunito', sans-serif; }
+
+        .focus-ring:focus-visible {
+            outline: 3px solid #3b82f6;
+            outline-offset: 2px;
+        }
+
+        .btn-bounce {
+            transition: transform 0.15s ease, box-shadow 0.2s ease;
+        }
+        .btn-bounce:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.15);
+        }
+        .btn-bounce:active {
+            transform: scale(0.98);
+        }
+
+        .float-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.4;
+            animation: floatOrb 10s ease-in-out infinite;
+        }
+        .float-orb:nth-child(2) { animation-delay: -4s; animation-duration: 13s; }
+        .float-orb:nth-child(3) { animation-delay: -7s; animation-duration: 11s; }
+
+        @keyframes floatOrb {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(20px, -15px) scale(1.04); }
+            66% { transform: translate(-15px, 10px) scale(0.96); }
+        }
+
+        .card-enter {
+            animation: cardEnter 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes cardEnter {
+            from { opacity: 0; transform: translateY(24px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .form-input {
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .form-input:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+
+        .dot-grid {
+            background-image: radial-gradient(circle, #e2e8f0 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        .spinner { animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .shake {
+            animation: shake 0.4s ease;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translate(0); }
+            20% { transform: translateX(-5px); }
+            40% { transform: translateX(5px); }
+            60% { transform: translateX(-3px); }
+            80% { transform: translateX(3px); }
+        }
+
+        /* 锁图标脉冲 */
+        .lock-pulse {
+            animation: lockPulse 2s ease-in-out infinite;
+        }
+        @keyframes lockPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* 文件图标浮动 */
+        .file-float {
+            animation: fileFloat 4s ease-in-out infinite;
+        }
+        @keyframes fileFloat {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-6px) rotate(2deg); }
+        }
+
+        /* 下载按钮脉冲 */
+        .download-pulse {
+            position: relative;
+        }
+        .download-pulse::after {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: inherit;
+            background: inherit;
+            opacity: 0;
+            z-index: -1;
+            animation: downloadPulse 2s ease-out infinite;
+        }
+        @keyframes downloadPulse {
+            0% { transform: scale(1); opacity: 0.4; }
+            100% { transform: scale(1.15); opacity: 0; }
+        }
+
+        /* 过渡视图 */
+        .view-transition {
+            animation: viewFade 0.4s ease forwards;
+        }
+        @keyframes viewFade {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 密码眼睛 */
+        .pwd-toggle { transition: color 0.15s ease; }
+        .pwd-toggle:hover { color: #3b82f6; }
+
+        /* 信息行 hover */
+        .info-row {
+            transition: background-color 0.15s ease;
+        }
+        .info-row:hover {
+            background-color: #f8fafc;
+        }
+
+        /* 底部品牌 */
+        .brand-link {
+            transition: opacity 0.2s ease;
+        }
+        .brand-link:hover {
+            opacity: 1;
+        }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center">
-    <div class="bg-white rounded-lg shadow-md p-8 w-full max-w-md">
-        <h1 class="text-xl font-bold text-gray-800 mb-2">{{.project_name}}</h1>
-        <div class="mb-4 text-sm text-gray-600">
-            <p>文件名：{{.item_name}}</p>
-            {{if .is_folder}}
-            <p>类型：文件夹</p>
-            {{else}}
-            <p>大小：{{.item_size}} bytes</p>
-            {{end}}
+<body class="bg-gray-50 min-h-screen dot-grid relative overflow-hidden">
+    <!-- 装饰浮动球 -->
+    <div class="float-orb w-72 h-72 bg-blue-400/30 -top-20 -right-20 pointer-events-none"></div>
+    <div class="float-orb w-56 h-56 bg-purple-400/25 bottom-10 -left-16 pointer-events-none"></div>
+    <div class="float-orb w-40 h-40 bg-pink-400/20 top-1/2 right-1/4 pointer-events-none"></div>
+
+    <div class="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 relative z-10">
+        <!-- 品牌标识 -->
+        <div class="card-enter mb-6 flex items-center gap-2.5 opacity-60 hover:opacity-100 transition-opacity">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center shadow-md">
+                <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                </svg>
+            </div>
+            <span class="text-sm font-bold text-gray-500 tracking-wide">NDisk</span>
         </div>
 
-        {{if .needs_password}}
-        <!-- 需要密码 -->
-        <div id="password-view">
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">此分享需要密码访问</label>
-                <input type="text" id="share-password" placeholder="请输入密码"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <p id="password-error" class="hidden mt-2 text-sm text-red-600">密码错误</p>
+        <!-- 主卡片 -->
+        <div class="card-enter bg-white rounded-3xl shadow-xl border-2 border-gray-100 w-full max-w-md overflow-hidden" style="animation-delay: 0.1s;">
+            <!-- 顶部文件信息条 -->
+            <div class="bg-gradient-to-r from-blue-50 to-purple-50 border-b-2 border-gray-100 px-6 sm:px-8 py-5">
+                <div class="flex items-center gap-4">
+                    <!-- 文件类型图标 -->
+                    <div class="file-float w-14 h-14 rounded-2xl {{if .is_folder}}bg-amber-100{{else}}bg-blue-100{{end}} flex items-center justify-center shadow-sm shrink-0">
+                        {{if .is_folder}}
+                        <svg class="w-7 h-7 text-amber-600" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                        </svg>
+                        {{else}}
+                        <svg class="w-7 h-7 text-blue-600" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/>
+                        </svg>
+                        {{end}}
+                    </div>
+                    <!-- 文件名和项目名 -->
+                    <div class="min-w-0 flex-1">
+                        <h1 class="text-lg font-extrabold text-gray-900 truncate">{{.project_name}}</h1>
+                        <p class="text-sm text-gray-500 font-medium truncate mt-0.5">{{.item_name}}</p>
+                    </div>
+                </div>
             </div>
-            <button onclick="verifyPassword()"
-                class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">验证</button>
+
+            <!-- 文件详情 -->
+            <div class="px-6 sm:px-8 py-4 border-b-2 border-gray-50">
+                <div class="divide-y divide-gray-100">
+                    <!-- 类型 -->
+                    <div class="info-row flex items-center justify-between py-3 -mx-2 px-2 rounded-lg">
+                        <span class="text-sm font-semibold text-gray-500 flex items-center gap-2">
+                            <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                            </svg>
+                            类型
+                        </span>
+                        <span class="text-sm font-bold text-gray-800">
+                            {{if .is_folder}}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700 text-xs font-bold">📁 文件夹</span>
+                            {{else}}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-100 text-blue-700 text-xs font-bold">📄 文件</span>
+                            {{end}}
+                        </span>
+                    </div>
+                    {{if not .is_folder}}
+                    <!-- 大小 -->
+                    <div class="info-row flex items-center justify-between py-3 -mx-2 px-2 rounded-lg">
+                        <span class="text-sm font-semibold text-gray-500 flex items-center gap-2">
+                            <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
+                            </svg>
+                            大小
+                        </span>
+                        <span class="text-sm font-bold text-gray-800" id="file-size">{{.item_size}}</span>
+                    </div>
+                    {{end}}
+                    <!-- 密码保护 -->
+                    <div class="info-row flex items-center justify-between py-3 -mx-2 px-2 rounded-lg">
+                        <span class="text-sm font-semibold text-gray-500 flex items-center gap-2">
+                            <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                            </svg>
+                            访问
+                        </span>
+                        <span class="text-sm font-bold">
+                            {{if .needs_password}}
+                            <span class="inline-flex items-center gap-1 text-amber-600">
+                                <svg class="w-3.5 h-3.5 lock-pulse" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                                </svg>
+                                密码保护
+                            </span>
+                            {{else}}
+                            <span class="text-green-600 flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                                    <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+                                </svg>
+                                公开访问
+                            </span>
+                            {{end}}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 操作区 -->
+            <div class="px-6 sm:px-8 py-6">
+                {{if .needs_password}}
+                <!-- 需要密码 -->
+                <div id="password-view">
+                    <div class="mb-4">
+                        <label for="share-password" class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                            </svg>
+                            输入访问密码
+                        </label>
+                        <div class="relative">
+                            <input type="password" id="share-password" placeholder="请输入密码…"
+                                autocomplete="off"
+                                class="form-input w-full pl-4 pr-12 py-3.5 border-2 border-gray-200 rounded-xl font-semibold text-gray-900 placeholder-gray-400 focus-ring">
+                            <button type="button" onclick="togglePwd()" class="absolute inset-y-0 right-0 pr-4 flex items-center pwd-toggle text-gray-400 focus-ring rounded-lg" aria-label="显示/隐藏密码">
+                                <svg id="pwd-eye-off" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                                </svg>
+                                <svg id="pwd-eye-on" class="w-5 h-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div id="password-error" class="hidden mt-2 text-sm font-semibold text-red-600 flex items-center gap-1.5" role="alert">
+                            <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                            </svg>
+                            <span></span>
+                        </div>
+                    </div>
+                    <button onclick="verifyPassword()" id="verify-btn"
+                        class="btn-bounce w-full py-3.5 px-6 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold text-base rounded-xl shadow-lg focus-ring flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
+                        </svg>
+                        <span id="verify-btn-text">验证密码</span>
+                        <svg id="verify-spinner" class="hidden w-5 h-5 spinner" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- 验证通过后显示下载 -->
+                <div id="download-view" class="hidden view-transition">
+                    <div class="flex items-center gap-2 mb-4 p-3 rounded-xl bg-green-50 border-2 border-green-200">
+                        <svg class="w-5 h-5 text-green-600 shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-sm font-bold text-green-700">密码验证通过</span>
+                    </div>
+                    <button onclick="downloadShare()"
+                        class="download-pulse btn-bounce w-full py-3.5 px-6 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold text-base rounded-xl shadow-lg focus-ring flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        下载文件
+                    </button>
+                </div>
+                {{else}}
+                <!-- 无需密码，直接下载 -->
+                <button onclick="downloadShare()"
+                    class="download-pulse btn-bounce w-full py-3.5 px-6 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold text-base rounded-xl shadow-lg focus-ring flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    下载文件
+                </button>
+                {{end}}
+            </div>
         </div>
-        <div id="download-view" class="hidden">
-            <button onclick="downloadShare()"
-                class="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">下载</button>
+
+        <!-- 底部 -->
+        <div class="card-enter mt-6 flex items-center gap-2 opacity-40 hover:opacity-70 transition-opacity" style="animation-delay: 0.2s;">
+            <div class="w-5 h-5 rounded-md bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                <svg class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                </svg>
+            </div>
+            <span class="text-xs font-bold text-gray-400">NDisk &middot; 安全分享</span>
         </div>
-        {{else}}
-        <!-- 无需密码 -->
-        <button onclick="downloadShare()"
-            class="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">下载</button>
-        {{end}}
     </div>
 
     <script>
         var shareToken = "{{.share_token}}";
-        var passwordVerified = false;
         var enteredPassword = "";
 
-        function verifyPassword() {
-            var password = document.getElementById("share-password").value;
-            if (!password) return;
+        // 格式化文件大小
+        (function() {
+            var sizeEl = document.getElementById('file-size');
+            if (sizeEl) {
+                var bytes = parseInt(sizeEl.textContent, 10);
+                if (!isNaN(bytes)) {
+                    sizeEl.textContent = formatBytes(bytes);
+                }
+            }
+        })();
 
-            fetch("/api/shares/" + shareToken + "/verify", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            var k = 1024;
+            var sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            var i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        // 密码显示/隐藏
+        function togglePwd() {
+            var input = document.getElementById('share-password');
+            var off = document.getElementById('pwd-eye-off');
+            var on = document.getElementById('pwd-eye-on');
+            if (input.type === 'password') {
+                input.type = 'text';
+                off.classList.add('hidden');
+                on.classList.remove('hidden');
+            } else {
+                input.type = 'password';
+                off.classList.remove('hidden');
+                on.classList.add('hidden');
+            }
+        }
+
+        // 设置验证加载态
+        function setVerifyLoading(loading) {
+            var btn = document.getElementById('verify-btn');
+            var text = document.getElementById('verify-btn-text');
+            var spinner = document.getElementById('verify-spinner');
+            if (loading) {
+                btn.disabled = true;
+                btn.classList.add('opacity-80', 'cursor-not-allowed');
+                text.textContent = '验证中…';
+                spinner.classList.remove('hidden');
+            } else {
+                btn.disabled = false;
+                btn.classList.remove('opacity-80', 'cursor-not-allowed');
+                text.textContent = '验证密码';
+                spinner.classList.add('hidden');
+            }
+        }
+
+        function showError(msg) {
+            var el = document.getElementById('password-error');
+            el.querySelector('span').textContent = msg;
+            el.classList.remove('hidden');
+            el.classList.add('shake');
+            setTimeout(function() { el.classList.remove('shake'); }, 400);
+        }
+
+        function hideError() {
+            document.getElementById('password-error').classList.add('hidden');
+        }
+
+        // 输入时隐藏错误
+        document.getElementById('share-password').addEventListener('input', hideError);
+
+        // 回车提交
+        document.getElementById('share-password').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                verifyPassword();
+            }
+        });
+
+        function verifyPassword() {
+            var password = document.getElementById('share-password').value;
+            if (!password) {
+                showError('请输入密码');
+                return;
+            }
+
+            hideError();
+            setVerifyLoading(true);
+
+            fetch('/api/shares/' + shareToken + '/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ password: password })
             }).then(function(res) {
                 return res.json().then(function(data) { return { ok: res.ok, data: data }; });
             }).then(function(result) {
                 if (result.ok) {
-                    passwordVerified = true;
-                    enteredPassword = document.getElementById("share-password").value;
-                    document.getElementById("password-view").classList.add("hidden");
-                    document.getElementById("download-view").classList.remove("hidden");
+                    enteredPassword = password;
+                    document.getElementById('password-view').classList.add('hidden');
+                    document.getElementById('download-view').classList.remove('hidden');
                 } else {
-                    var errEl = document.getElementById("password-error");
-                    errEl.textContent = result.data.error || "密码错误";
-                    errEl.classList.remove("hidden");
+                    setVerifyLoading(false);
+                    showError(result.data.error || '密码错误，请重试');
                 }
             }).catch(function() {
-                alert("网络错误，请重试");
+                setVerifyLoading(false);
+                showError('网络错误，请检查连接后重试');
             });
         }
 
         function downloadShare() {
-            var url = "/api/shares/" + shareToken + "/download";
+            var url = '/api/shares/' + shareToken + '/download';
             if (enteredPassword) {
-                url += "?password=" + encodeURIComponent(enteredPassword);
+                url += '?password=' + encodeURIComponent(enteredPassword);
             }
             window.location.href = url;
         }
+
+        // 自动聚焦密码框
+        var pwdInput = document.getElementById('share-password');
+        if (pwdInput) pwdInput.focus();
     </script>
 </body>
 </html>
@@ -91,16 +487,157 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#f8fafc">
     <title>{{.title}} - NDisk</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['Nunito', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        @media (prefers-reduced-motion: reduce) {
+            *, ::before, ::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        * { font-family: 'Nunito', sans-serif; }
+
+        .float-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            animation: floatOrb 10s ease-in-out infinite;
+        }
+        .float-orb:nth-child(2) { animation-delay: -4s; animation-duration: 13s; }
+
+        @keyframes floatOrb {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(15px, -10px) scale(1.04); }
+        }
+
+        .dot-grid {
+            background-image: radial-gradient(circle, #e2e8f0 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        .card-enter {
+            animation: cardEnter 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes cardEnter {
+            from { opacity: 0; transform: translateY(24px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* 图标弹入 */
+        .icon-pop {
+            animation: iconPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
+        }
+        @keyframes iconPop {
+            from { opacity: 0; transform: scale(0.5); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* 警告图标抖动 */
+        .icon-shake {
+            animation: iconShake 0.6s ease 0.5s;
+        }
+        @keyframes iconShake {
+            0%, 100% { transform: rotate(0deg); }
+            20% { transform: rotate(-8deg); }
+            40% { transform: rotate(8deg); }
+            60% { transform: rotate(-4deg); }
+            80% { transform: rotate(4deg); }
+        }
+
+        .btn-bounce {
+            transition: transform 0.15s ease, box-shadow 0.2s ease;
+        }
+        .btn-bounce:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.15);
+        }
+        .btn-bounce:active {
+            transform: scale(0.98);
+        }
+
+        .focus-ring:focus-visible {
+            outline: 3px solid #3b82f6;
+            outline-offset: 2px;
+        }
+
+        .brand-link {
+            transition: opacity 0.2s ease;
+        }
+        .brand-link:hover { opacity: 1; }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center">
-    <div class="bg-white rounded-lg shadow-md p-8 w-full max-w-md text-center">
-        <svg class="mx-auto h-12 w-12 text-red-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-        </svg>
-        <h1 class="text-xl font-bold text-gray-800 mb-2">{{.title}}</h1>
-        <p class="text-gray-600">{{.error}}</p>
+<body class="bg-gray-50 min-h-screen dot-grid relative overflow-hidden">
+    <!-- 装饰 -->
+    <div class="float-orb w-72 h-72 bg-red-400/20 -top-20 -right-20 pointer-events-none"></div>
+    <div class="float-orb w-56 h-56 bg-orange-400/15 bottom-10 -left-16 pointer-events-none"></div>
+
+    <div class="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 relative z-10">
+        <!-- 品牌 -->
+        <div class="card-enter mb-6 flex items-center gap-2.5 opacity-60 hover:opacity-100 transition-opacity">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center shadow-md">
+                <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                </svg>
+            </div>
+            <span class="text-sm font-bold text-gray-500 tracking-wide">NDisk</span>
+        </div>
+
+        <!-- 错误卡片 -->
+        <div class="card-enter bg-white rounded-3xl shadow-xl border-2 border-gray-100 w-full max-w-md overflow-hidden" style="animation-delay: 0.1s;">
+            <!-- 顶部红色条 -->
+            <div class="h-1.5 bg-gradient-to-r from-red-400 via-orange-400 to-red-400"></div>
+
+            <div class="p-8 sm:p-10 text-center">
+                <!-- 错误图标 -->
+                <div class="icon-pop icon-shake inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-100 mb-6">
+                    <svg class="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+                    </svg>
+                </div>
+
+                <!-- 标题 -->
+                <h1 class="text-xl sm:text-2xl font-extrabold text-gray-900 mb-2">{{.title}}</h1>
+
+                <!-- 错误描述 -->
+                <p class="text-gray-500 font-medium leading-relaxed mb-8">{{.error}}</p>
+
+                <!-- 操作按钮 -->
+                <a href="/" class="btn-bounce inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-xl shadow-lg focus-ring gap-2">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    </svg>
+                    返回首页
+                </a>
+            </div>
+        </div>
+
+        <!-- 底部 -->
+        <div class="card-enter mt-6 flex items-center gap-2 opacity-40 hover:opacity-70 transition-opacity" style="animation-delay: 0.2s;">
+            <div class="w-5 h-5 rounded-md bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                <svg class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                </svg>
+            </div>
+            <span class="text-xs font-bold text-gray-400">NDisk &middot; 安全分享</span>
+        </div>
     </div>
 </body>
 </html>
