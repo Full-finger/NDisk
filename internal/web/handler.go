@@ -71,7 +71,7 @@ func (h *Handler) SharesPage(c *gin.Context) {
 	username := c.GetString("username")
 	accessToken := c.GetString("access_token")
 
-	c.HTML(http.StatusOK, "my_shares", gin.H{
+	c.HTML(http.StatusOK, "shares", gin.H{
 		"title":       "我的分享",
 		"username":    username,
 		"accessToken": accessToken,
