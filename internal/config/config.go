@@ -60,6 +60,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("error unmarshaling config: %w", err)
 	}
 
+	// 检查是否使用了默认的数据库驱动但配置了 postgres DSN
+	if cfg.Database.Driver == "" {
+		cfg.Database.Driver = "sqlite"
+	}
+
 	// 检查是否使用了默认的 JWT 密钥
 	if cfg.JWTSecret == "your-secret-key-change-in-production" || cfg.JWTSecret == "" {
 		return nil, fmt.Errorf("JWT_SECRET must be set and cannot use default value")
@@ -80,10 +85,13 @@ port = "8080"
 jwt_secret = "your-secret-key-change-in-production"
 
 [database]
-# 数据库驱动 (sqlite, mysql, postgres)
+# 数据库驱动 (sqlite, postgres)
 driver = "sqlite"
-# 数据库连接字符串
+# SQLite 连接字符串
 dsn = "data/netdisk.db"
+# PostgreSQL 连接字符串示例（取消注释并修改后使用）：
+# driver = "postgres"
+# dsn = "host=127.0.0.1 user=ndisk password=mysecretpassword dbname=ndisk port=5432 sslmode=disable TimeZone=Asia/Shanghai"
 
 [storage]
 # 文件存储路径
