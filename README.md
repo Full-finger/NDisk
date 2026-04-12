@@ -35,6 +35,9 @@ cd NDisk
 # 复制配置文件并修改
 cp config.example.toml config.toml
 
+#生成数据目录
+mkdir data
+
 # 运行
 make run
 ```

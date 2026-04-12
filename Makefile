@@ -6,6 +6,9 @@ run:
 build:
 	go build -o bin/server ./cmd/server
 
+init:
+	mkdir data
+
 test:
 	go test ./...
 
