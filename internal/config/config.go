@@ -17,6 +17,11 @@ type Config struct {
 	Storage struct {
 		Path string `mapstructure:"path"`
 	} `mapstructure:"storage"`
+	NFS struct {
+		Enabled bool   `mapstructure:"enabled"`
+		Port    string `mapstructure:"port"`
+		HMACKey string `mapstructure:"hmac_key"`
+	} `mapstructure:"nfs"`
 }
 
 func Load() (*Config, error) {
@@ -28,6 +33,8 @@ func Load() (*Config, error) {
 	v.SetDefault("database.driver", "sqlite")
 	v.SetDefault("database.dsn", "data/netdisk.db")
 	v.SetDefault("storage.path", "data/uploads")
+	v.SetDefault("nfs.enabled", false)
+	v.SetDefault("nfs.port", "2049")
 
 	// 设置配置文件
 	v.SetConfigName("config")
@@ -63,7 +70,8 @@ func Load() (*Config, error) {
 
 // GenerateExampleConfig 生成示例配置文件
 func GenerateExampleConfig(path string) error {
-	content := `# NDisk 配置文件
+	content := `# NDisk 配置文件示例
+# 复制此文件为 config.toml 并修改配置
 
 # 服务端口
 port = "8080"
@@ -80,6 +88,14 @@ dsn = "data/netdisk.db"
 [storage]
 # 文件存储路径
 path = "data/uploads"
+
+[nfs]
+# 是否启用 NFS 协议支持
+enabled = false
+# NFS 服务端口
+port = "2049"
+# NFS 句柄签名密钥（生产环境请更换为随机字符串）
+hmac_key = "change-this-to-a-random-secret"
 `
 	return os.WriteFile(path, []byte(content), 0644)
 }

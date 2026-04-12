@@ -16,3 +16,11 @@ dsn = "data/netdisk.db"
 [storage]
 # 文件存储路径
 path = "data/uploads"
+
+[nfs]
+# 是否启用 NFS 协议支持
+enabled = false
+# NFS 服务端口
+port = "2049"
+# NFS 句柄签名密钥（生产环境请更换为随机字符串）
+hmac_key = "change-this-to-a-random-secret"
