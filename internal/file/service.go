@@ -31,6 +31,11 @@ func NewService(db *gorm.DB, storageObj storage.Storage) *Service {
 	}
 }
 
+// DB 返回底层数据库实例
+func (s *Service) DB() *gorm.DB {
+	return s.db
+}
+
 // SetZipDir 设置 ZIP 缓存目录
 func (s *Service) SetZipDir(dir string) {
 	s.zipDir = dir

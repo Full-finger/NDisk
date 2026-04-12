@@ -11,6 +11,7 @@ import (
 	"github.com/Full-finger/NDisk/internal/config"
 	"github.com/Full-finger/NDisk/internal/database"
 	"github.com/Full-finger/NDisk/internal/file"
+	nfspkg "github.com/Full-finger/NDisk/internal/nfs"
 	"github.com/Full-finger/NDisk/internal/share"
 	"github.com/Full-finger/NDisk/internal/storage"
 	"github.com/Full-finger/NDisk/internal/web"
@@ -29,7 +30,7 @@ func main() {
 	}
 
 	// 自动迁移
-	db.AutoMigrate(&auth.User{}, &auth.RefreshToken{}, &file.File{}, &file.DownloadLink{}, &share.Share{})
+	db.AutoMigrate(&auth.User{}, &auth.RefreshToken{}, &file.File{}, &file.DownloadLink{}, &share.Share{}, &nfspkg.NFSToken{})
 
 	store := storage.NewLocal(cfg.Storage.Path)
 
@@ -46,6 +47,23 @@ func main() {
 
 	shareService := share.NewService(db)
 	shareHandler := share.NewHandler(shareService, fileService)
+
+	// NFS 服务（如果启用）
+	if cfg.NFS.Enabled {
+		hmacKey := cfg.NFS.HMACKey
+		if hmacKey == "" {
+			hmacKey = cfg.JWTSecret // 回退使用 JWT 密钥
+		}
+		nfsServer := nfspkg.NewServer(fileService, store, hmacKey, cfg.NFS.Port)
+		if err := nfsServer.Start(); err != nil {
+			log.Printf("Warning: NFS server failed to start: %v", err)
+		} else {
+			log.Printf("NFS server enabled on :%s", cfg.NFS.Port)
+		}
+	}
+
+	// NFS Token 管理 API
+	nfsAPIHandler := nfspkg.NewAPIHandler(db)
 
 	r := gin.Default()
 
@@ -75,6 +93,13 @@ func main() {
 	shareGroup.Use(webHandler.CookieAuthMiddleware())
 	{
 		shareGroup.GET("", webHandler.SharesPage)
+	}
+
+	// NFS 管理页面（需要认证 - refresh token cookie）
+	nfsGroup := r.Group("/nfs")
+	nfsGroup.Use(webHandler.CookieAuthMiddleware())
+	{
+		nfsGroup.GET("", webHandler.NFSPage)
 	}
 
 	// 认证路由
@@ -125,6 +150,11 @@ func main() {
 		api.POST("/shares", shareHandler.CreateShare)
 		api.GET("/shares", shareHandler.ListShares)
 		api.DELETE("/shares/:id", shareHandler.DeleteShare)
+
+		// NFS Token 管理（需要认证）
+		api.POST("/nfs/tokens", nfsAPIHandler.CreateToken)
+		api.GET("/nfs/tokens", nfsAPIHandler.ListTokens)
+		api.DELETE("/nfs/tokens/:id", nfsAPIHandler.DeleteToken)
 	}
 
 	// 首页重定向
