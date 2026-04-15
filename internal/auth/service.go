@@ -229,6 +229,20 @@ func (s *Service) UpdateNickname(userID uint, nickname string) error {
 	return s.db.Model(&User{}).Where("id = ?", userID).Update("nickname", nickname).Error
 }
 
+// UpdateWallpaper 更新用户壁纸设置
+func (s *Service) UpdateWallpaper(userID uint, wallpaperURL string, wallpaperBlur int) error {
+	if wallpaperBlur < 0 {
+		wallpaperBlur = 0
+	}
+	if wallpaperBlur > 20 {
+		wallpaperBlur = 20
+	}
+	return s.db.Model(&User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+		"wallpaper_url":  wallpaperURL,
+		"wallpaper_blur": wallpaperBlur,
+	}).Error
+}
+
 // CleanExpiredRefreshTokens 清理过期的 refresh token
 func (s *Service) CleanExpiredRefreshTokens() {
 	s.db.Where("expires_at < ? OR revoked = ?", time.Now(), true).Delete(&RefreshToken{})

@@ -22,6 +22,9 @@ type Config struct {
 		Port    string `mapstructure:"port"`
 		HMACKey string `mapstructure:"hmac_key"`
 	} `mapstructure:"nfs"`
+	Wallpaper struct {
+		DefaultURL string `mapstructure:"default_url"`
+	} `mapstructure:"wallpaper"`
 }
 
 func Load() (*Config, error) {
@@ -35,6 +38,7 @@ func Load() (*Config, error) {
 	v.SetDefault("storage.path", "data/uploads")
 	v.SetDefault("nfs.enabled", false)
 	v.SetDefault("nfs.port", "2049")
+	v.SetDefault("wallpaper.default_url", "/static/img/wallpaper.jpg")
 
 	// 设置配置文件
 	v.SetConfigName("config")

@@ -25,3 +25,8 @@ enabled = false
 port = "2049"
 # NFS 句柄签名密钥（生产环境请更换为随机字符串）
 hmac_key = "change-this-to-a-random-secret"
+
+[wallpaper]
+# 默认壁纸 URL（留空则使用圆点装饰背景）
+# default_url = "https://example.com/bg.jpg"
+default_url = ""

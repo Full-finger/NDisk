@@ -10,16 +10,18 @@ import (
 )
 
 type Handler struct {
-	authService *auth.Service
-	fileService *file.Service
-	jwtSecret   string
+	authService      *auth.Service
+	fileService      *file.Service
+	jwtSecret        string
+	defaultWallpaper string
 }
 
-func NewHandler(authService *auth.Service, fileService *file.Service, jwtSecret string) *Handler {
+func NewHandler(authService *auth.Service, fileService *file.Service, jwtSecret string, defaultWallpaper string) *Handler {
 	return &Handler{
-		authService: authService,
-		fileService: fileService,
-		jwtSecret:   jwtSecret,
+		authService:      authService,
+		fileService:      fileService,
+		jwtSecret:        jwtSecret,
+		defaultWallpaper: defaultWallpaper,
 	}
 }
 
@@ -57,14 +59,16 @@ func (h *Handler) FilesPage(c *gin.Context) {
 	breadcrumb, _ := h.fileService.GetBreadcrumb(userID, parentID)
 
 	c.HTML(http.StatusOK, "files", gin.H{
-		"title":       "文件管理",
-		"username":    username,
-		"nickname":    nickname,
-		"files":       files,
-		"folders":     folders,
-		"parentID":    parentID,
-		"breadcrumb":  breadcrumb,
-		"accessToken": accessToken,
+		"title":          "文件管理",
+		"username":       username,
+		"nickname":       nickname,
+		"files":          files,
+		"folders":        folders,
+		"parentID":       parentID,
+		"breadcrumb":     breadcrumb,
+		"accessToken":    accessToken,
+		"wallpaper_url":  c.GetString("wallpaper_url"),
+		"wallpaper_blur": c.GetInt("wallpaper_blur"),
 	})
 }
 
@@ -75,10 +79,12 @@ func (h *Handler) SharesPage(c *gin.Context) {
 	accessToken := c.GetString("access_token")
 
 	c.HTML(http.StatusOK, "shares", gin.H{
-		"title":       "我的分享",
-		"username":    username,
-		"nickname":    nickname,
-		"accessToken": accessToken,
+		"title":          "我的分享",
+		"username":       username,
+		"nickname":       nickname,
+		"accessToken":    accessToken,
+		"wallpaper_url":  c.GetString("wallpaper_url"),
+		"wallpaper_blur": c.GetInt("wallpaper_blur"),
 	})
 }
 
@@ -89,10 +95,12 @@ func (h *Handler) NFSPage(c *gin.Context) {
 	accessToken := c.GetString("access_token")
 
 	c.HTML(http.StatusOK, "nfs", gin.H{
-		"title":       "NFS 挂载管理",
-		"username":    username,
-		"nickname":    nickname,
-		"accessToken": accessToken,
+		"title":          "NFS 挂载管理",
+		"username":       username,
+		"nickname":       nickname,
+		"accessToken":    accessToken,
+		"wallpaper_url":  c.GetString("wallpaper_url"),
+		"wallpaper_blur": c.GetInt("wallpaper_blur"),
 	})
 }
 
@@ -103,10 +111,12 @@ func (h *Handler) ProfilePage(c *gin.Context) {
 	accessToken := c.GetString("access_token")
 
 	c.HTML(http.StatusOK, "profile", gin.H{
-		"title":       "个人资料",
-		"username":    username,
-		"nickname":    nickname,
-		"accessToken": accessToken,
+		"title":          "个人资料",
+		"username":       username,
+		"nickname":       nickname,
+		"accessToken":    accessToken,
+		"wallpaper_url":  c.GetString("wallpaper_url"),
+		"wallpaper_blur": c.GetInt("wallpaper_blur"),
 	})
 }
 
@@ -163,6 +173,14 @@ func (h *Handler) CookieAuthMiddleware() gin.HandlerFunc {
 		c.Set("username", user.Username)
 		c.Set("nickname", nickname)
 		c.Set("access_token", accessToken)
+
+		// 壁纸设置：用户自定义优先，否则用配置默认值
+		wallpaperURL := user.WallpaperURL
+		if wallpaperURL == "" {
+			wallpaperURL = h.defaultWallpaper
+		}
+		c.Set("wallpaper_url", wallpaperURL)
+		c.Set("wallpaper_blur", user.WallpaperBlur)
 
 		c.Next()
 	}

@@ -43,7 +43,7 @@ func main() {
 	fileService.StartCacheCleaner()
 	fileHandler := file.NewHandler(fileService, cfg.JWTSecret)
 
-	webHandler := web.NewHandler(authService, fileService, cfg.JWTSecret)
+	webHandler := web.NewHandler(authService, fileService, cfg.JWTSecret, cfg.Wallpaper.DefaultURL)
 
 	shareService := share.NewService(db)
 	shareHandler := share.NewHandler(shareService, fileService)
@@ -165,6 +165,7 @@ func main() {
 
 		// 个人资料（需要认证）
 		api.PUT("/auth/profile", authHandler.UpdateProfile)
+		api.PUT("/auth/wallpaper", authHandler.UpdateWallpaper)
 	}
 
 	// 首页重定向

@@ -2,6 +2,8 @@ package auth
 
 import (
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -154,4 +156,41 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "更新成功", "nickname": req.Nickname})
+}
+
+// UpdateWallpaper 更新用户壁纸设置
+func (h *Handler) UpdateWallpaper(c *gin.Context) {
+	var req UpdateWallpaperRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求格式错误"})
+		return
+	}
+
+	// 验证 URL：留空合法（恢复默认），否则必须是 http/https 协议
+	if req.WallpaperURL != "" {
+		req.WallpaperURL = strings.TrimSpace(req.WallpaperURL)
+		parsed, err := url.ParseRequestURI(req.WallpaperURL)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "URL 格式无效"})
+			return
+		}
+		scheme := strings.ToLower(parsed.Scheme)
+		if scheme != "http" && scheme != "https" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "仅支持 http/https 协议的 URL"})
+			return
+		}
+		// 拒绝包含控制字符或换行的 URL
+		if strings.ContainsAny(req.WallpaperURL, "\r\n\t\x00") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "URL 包含非法字符"})
+			return
+		}
+	}
+
+	userID := c.GetUint("user_id")
+	if err := h.service.UpdateWallpaper(userID, req.WallpaperURL, req.WallpaperBlur); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
 }

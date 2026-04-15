@@ -229,8 +229,23 @@
 </head>
 <body class="bg-gray-50 min-h-screen">
     <div class="min-h-screen flex flex-col">
-        <!-- 轻微装饰背景 -->
+        <!-- 背景 -->
+        {{if .wallpaper_url}}
+        <div id="wallpaper-bg" class="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+            <div id="wallpaper-layer" class="absolute inset-0 bg-cover bg-center bg-no-repeat"></div>
+            <div class="absolute inset-0 bg-black/20"></div>
+        </div>
+        <script>
+        (function(){
+            var el = document.getElementById('wallpaper-layer');
+            el.style.backgroundImage = 'url(' + JSON.stringify({{.wallpaper_url}}) + ')';
+            el.style.filter = 'blur(' + Math.min(Math.max(0, {{.wallpaper_blur}}), 20) + 'px)';
+            el.style.transform = 'scale(1.1)';
+        })();
+        </script>
+        {{else}}
         <div class="fixed inset-0 dot-pattern pointer-events-none -z-10 opacity-50"></div>
+        {{end}}
 
         <!-- 顶部导航 -->
         <nav class="bg-white border-b-2 border-gray-100 sticky top-0 z-50">

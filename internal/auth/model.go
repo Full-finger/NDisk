@@ -7,13 +7,15 @@ import (
 )
 
 type User struct {
-	ID        uint   `gorm:"primaryKey"`
-	Username  string `gorm:"uniqueIndex;size:64"`
-	Nickname  string `gorm:"size:64"`
-	Password  string `gorm:"size:255"` // bcrypt hash
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt `gorm:"index"`
+	ID            uint   `gorm:"primaryKey"`
+	Username      string `gorm:"uniqueIndex;size:64"`
+	Nickname      string `gorm:"size:64"`
+	Password      string `gorm:"size:255"` // bcrypt hash
+	WallpaperURL  string `gorm:"size:512"`
+	WallpaperBlur int
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	DeletedAt     gorm.DeletedAt `gorm:"index"`
 }
 
 // 注册请求
@@ -54,4 +56,10 @@ type UserInfo struct {
 // UpdateProfileRequest 更新个人资料请求
 type UpdateProfileRequest struct {
 	Nickname string `json:"nickname" binding:"required,min=1,max=64"`
+}
+
+// UpdateWallpaperRequest 更新壁纸设置请求
+type UpdateWallpaperRequest struct {
+	WallpaperURL  string `json:"wallpaper_url"`
+	WallpaperBlur int    `json:"wallpaper_blur"`
 }
