@@ -248,9 +248,9 @@ func (s *Service) GetFolder(userID uint, folderID uint) (*File, error) {
 	return &folder, nil
 }
 
-// ETag 生成文件ETag
+// ETag 生成文件ETag，基于内容哈希和文件大小
 func (f *File) ETag() string {
-	return fmt.Sprintf(`"%x-%d"`, f.ID, f.Size)
+	return fmt.Sprintf(`"%s-%d"`, f.ContentHash[:16], f.Size)
 }
 
 // BreadcrumbItem 面包屑导航项
@@ -689,43 +689,43 @@ func (s *Service) findCachedZip(folderID uint) string {
 }
 
 // GenerateFolderZip 生成文件夹的 ZIP 压缩包（带缓存）
-// 返回值：ZIP 文件路径、文件夹信息、是否来自缓存
-func (s *Service) GenerateFolderZip(userID uint, folderID uint) (string, *File, bool, error) {
+// 返回值：ZIP 文件路径、文件夹信息、内容哈希、是否来自缓存、错误
+func (s *Service) GenerateFolderZip(userID uint, folderID uint) (string, *File, string, bool, error) {
 	// 获取文件夹信息
 	var folder File
 	if err := s.db.Where("id = ? AND user_id = ? AND is_dir = ?", folderID, userID, true).First(&folder).Error; err != nil {
-		return "", nil, false, fmt.Errorf("文件夹不存在")
+		return "", nil, "", false, fmt.Errorf("文件夹不存在")
 	}
 
 	// 计算内容哈希
 	contentHash, err := s.computeContentHash(userID, folderID)
 	if err != nil {
-		return "", nil, false, fmt.Errorf("计算内容哈希失败: %v", err)
+		return "", nil, "", false, fmt.Errorf("计算内容哈希失败: %v", err)
 	}
 
 	// 检查缓存
 	expectedPath := s.zipCachePath(folderID, contentHash)
 	if _, err := os.Stat(expectedPath); err == nil {
 		// 缓存命中
-		return expectedPath, &folder, true, nil
+		return expectedPath, &folder, contentHash, true, nil
 	}
 
 	// 缓存未命中，生成新的 ZIP
 	// 获取文件夹树
 	items, err := s.getFolderTree(userID, folderID, "")
 	if err != nil {
-		return "", nil, false, fmt.Errorf("获取文件夹内容失败: %v", err)
+		return "", nil, "", false, fmt.Errorf("获取文件夹内容失败: %v", err)
 	}
 
 	if len(items) == 0 {
-		return "", nil, false, fmt.Errorf("文件夹为空")
+		return "", nil, "", false, fmt.Errorf("文件夹为空")
 	}
 
 	// 创建临时 ZIP 文件
 	tmpPath := expectedPath + ".tmp"
 	zipFile, err := os.Create(tmpPath)
 	if err != nil {
-		return "", nil, false, fmt.Errorf("创建临时文件失败: %v", err)
+		return "", nil, "", false, fmt.Errorf("创建临时文件失败: %v", err)
 	}
 
 	zipWriter := zip.NewWriter(zipFile)
@@ -737,7 +737,7 @@ func (s *Service) GenerateFolderZip(userID uint, folderID uint) (string, *File, 
 			zipWriter.Close()
 			zipFile.Close()
 			os.Remove(tmpPath)
-			return "", nil, false, fmt.Errorf("打开文件 %s 失败: %v", item.RelPath, err)
+			return "", nil, "", false, fmt.Errorf("打开文件 %s 失败: %v", item.RelPath, err)
 		}
 
 		// 创建 ZIP 条目
@@ -747,7 +747,7 @@ func (s *Service) GenerateFolderZip(userID uint, folderID uint) (string, *File, 
 			zipWriter.Close()
 			zipFile.Close()
 			os.Remove(tmpPath)
-			return "", nil, false, fmt.Errorf("创建 ZIP 条目失败: %v", err)
+			return "", nil, "", false, fmt.Errorf("创建 ZIP 条目失败: %v", err)
 		}
 
 		_, err = io.Copy(w, reader)
@@ -756,7 +756,7 @@ func (s *Service) GenerateFolderZip(userID uint, folderID uint) (string, *File, 
 			zipWriter.Close()
 			zipFile.Close()
 			os.Remove(tmpPath)
-			return "", nil, false, fmt.Errorf("写入文件 %s 到 ZIP 失败: %v", item.RelPath, err)
+			return "", nil, "", false, fmt.Errorf("写入文件 %s 到 ZIP 失败: %v", item.RelPath, err)
 		}
 	}
 
@@ -764,7 +764,7 @@ func (s *Service) GenerateFolderZip(userID uint, folderID uint) (string, *File, 
 	if err := zipWriter.Close(); err != nil {
 		zipFile.Close()
 		os.Remove(tmpPath)
-		return "", nil, false, fmt.Errorf("关闭 ZIP 写入器失败: %v", err)
+		return "", nil, "", false, fmt.Errorf("关闭 ZIP 写入器失败: %v", err)
 	}
 	zipFile.Close()
 
@@ -774,10 +774,10 @@ func (s *Service) GenerateFolderZip(userID uint, folderID uint) (string, *File, 
 	// 重命名临时文件为正式文件
 	if err := os.Rename(tmpPath, expectedPath); err != nil {
 		os.Remove(tmpPath)
-		return "", nil, false, fmt.Errorf("重命名临时文件失败: %v", err)
+		return "", nil, "", false, fmt.Errorf("重命名临时文件失败: %v", err)
 	}
 
-	return expectedPath, &folder, false, nil
+	return expectedPath, &folder, contentHash, false, nil
 }
 
 // GetFolderZipInfo 获取 ZIP 缓存文件信息（用于 HEAD 请求）

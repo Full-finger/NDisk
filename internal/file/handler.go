@@ -362,7 +362,7 @@ func (h *Handler) downloadFileByLink(c *gin.Context, link *DownloadLink) {
 
 // downloadFolderByLink 通过短链接下载文件夹
 func (h *Handler) downloadFolderByLink(c *gin.Context, link *DownloadLink) {
-	zipPath, folder, fromCache, err := h.service.GenerateFolderZip(link.UserID, link.FileID)
+	zipPath, folder, contentHash, fromCache, err := h.service.GenerateFolderZip(link.UserID, link.FileID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -378,7 +378,7 @@ func (h *Handler) downloadFolderByLink(c *gin.Context, link *DownloadLink) {
 	zipName := folder.Name + ".zip"
 
 	c.Header("Accept-Ranges", "bytes")
-	c.Header("ETag", fmt.Sprintf(`"%x-%d"`, link.FileID, zipSize))
+	c.Header("ETag", fmt.Sprintf(`"%s-%d"`, contentHash[:16], zipSize))
 	c.Header("Last-Modified", zipInfo.ModTime().UTC().Format(http.TimeFormat))
 	c.Header("Content-Disposition", "attachment; filename="+url.QueryEscape(zipName))
 

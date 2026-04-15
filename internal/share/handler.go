@@ -180,7 +180,7 @@ func (h *Handler) downloadFile(c *gin.Context, share *Share) {
 }
 
 func (h *Handler) downloadFolder(c *gin.Context, share *Share) {
-	zipPath, folder, _, err := h.fileService.GenerateFolderZip(share.UserID, share.ItemID)
+	zipPath, folder, _, _, err := h.fileService.GenerateFolderZip(share.UserID, share.ItemID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
